@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #030310;
+  background: #010108;
   color: #ccc;
   font-family: 'Courier New', monospace;
   display: flex;
@@ -17,75 +17,69 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  width: 320px;
+  width: 340px;
 }
 
 h1 {
-  font-size: 3.5rem;
-  letter-spacing: 12px;
+  font-size: 4rem;
+  letter-spacing: 16px;
   color: #00e5ff;
-  text-shadow: 0 0 20px #00e5ff, 0 0 40px #00e5ff;
+  text-shadow: 0 0 24px #00e5ff, 0 0 48px #00e5ff;
 }
 
 .subtitle {
-  font-size: 0.75rem;
-  letter-spacing: 4px;
-  color: #445;
+  font-size: 0.72rem;
+  letter-spacing: 5px;
+  color: #334;
   margin-top: -12px;
+  text-transform: uppercase;
 }
 
 input[type="text"] {
   width: 100%;
-  background: #080820;
-  border: 1px solid #224;
-  border-radius: 4px;
+  background: #06060f;
+  border: 1px solid #1a2240;
+  border-radius: 2px;
   color: #eee;
   font-family: inherit;
   font-size: 1rem;
   padding: 10px 14px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color .15s;
 }
-input[type="text"]:focus { border-color: #00e5ff; }
+input[type="text"]:focus { border-color: #00e5ff; box-shadow: 0 0 8px #00e5ff44; }
 
 button {
   background: transparent;
   border: 1px solid #00e5ff;
-  border-radius: 4px;
+  border-radius: 2px;
   color: #00e5ff;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   letter-spacing: 2px;
-  padding: 10px 24px;
+  padding: 10px 22px;
   text-transform: uppercase;
-  transition: background 0.15s, box-shadow 0.15s;
+  transition: background .15s, box-shadow .15s;
   white-space: nowrap;
 }
-button:hover {
-  background: rgba(0, 229, 255, 0.1);
-  box-shadow: 0 0 12px #00e5ff;
-}
+button:hover { background: rgba(0,229,255,.1); box-shadow: 0 0 12px #00e5ff; }
 
-.lobby-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-}
+.lobby-row { display: flex; gap: 8px; width: 100%; }
 .lobby-row button { flex-shrink: 0; }
 .lobby-row input  { flex: 1; }
 
-.error { color: #ff4466; font-size: 0.85rem; min-height: 1.2em; text-align: center; }
-.dim   { color: #446; font-size: 0.8rem; text-align: center; }
+.error { color: #ff1744; font-size: .85rem; min-height: 1.2em; text-align: center; }
+.dim   { color: #334;    font-size: .8rem;  text-align: center; }
 
 /* ── Waiting room ── */
-#waiting-room h2 { font-size: 1rem; letter-spacing: 4px; color: #556; text-transform: uppercase; }
+#waiting-room h2 { font-size: .9rem; letter-spacing: 4px; color: #445; text-transform: uppercase; }
 
 #room-code-display {
-  font-size: 2.8rem;
-  letter-spacing: 10px;
+  font-size: 3rem;
+  letter-spacing: 12px;
   color: #fff;
-  text-shadow: 0 0 14px #00e5ff;
+  text-shadow: 0 0 16px #00e5ff, 0 0 32px #00e5ff;
 }
 
 #player-list {
@@ -96,57 +90,76 @@ button:hover {
   gap: 6px;
 }
 #player-list li {
-  background: #08081a;
+  background: #070715;
   border-left: 3px solid currentColor;
   padding: 8px 12px;
-  border-radius: 2px;
-  font-size: 0.9rem;
+  border-radius: 1px;
+  font-size: .9rem;
 }
 
-/* ── Game ── */
-#game-container {
-  position: fixed;
-  inset: 0;
+#bot-controls { display: flex; gap: 8px; }
+#bot-controls button {
+  font-size: .75rem;
+  padding: 8px 14px;
+  border-color: #334;
+  color: #778;
 }
-#c {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
+#bot-controls button:hover { border-color: #00e5ff; color: #00e5ff; }
 
-#hud {
+/* ── Game container ── */
+#game-container { position: fixed; inset: 0; }
+#c { display: block; width: 100%; height: 100%; }
+
+/* ── HUD top bar ── */
+#hud-top {
   position: fixed;
-  top: 16px;
+  top: 14px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
   pointer-events: none;
 }
-#hud-players {
-  display: flex;
-  gap: 10px;
-}
+#hud-top * { pointer-events: auto; }
+
+#hud-players { display: flex; gap: 8px; }
+
 .hud-chip {
   border: 1px solid currentColor;
-  border-radius: 3px;
-  font-size: 0.75rem;
+  border-radius: 2px;
+  font-size: .72rem;
   letter-spacing: 1px;
   padding: 4px 10px;
-  text-shadow: 0 0 8px currentColor;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,.6);
+  text-shadow: 0 0 6px currentColor;
 }
-.hud-chip.dead { opacity: 0.3; text-decoration: line-through; }
+.hud-chip.dead { opacity: .3; text-decoration: line-through; }
 .hud-chip.me::before { content: '▶ '; }
 
-#hud-dir {
-  color: #446;
-  font-size: 0.7rem;
-  letter-spacing: 2px;
-  background: rgba(0,0,0,0.5);
+#hud-controls { display: flex; gap: 6px; }
+
+.hud-btn {
+  font-size: .7rem;
   padding: 4px 10px;
-  border-radius: 3px;
+  letter-spacing: 1px;
+  background: rgba(0,0,0,.6);
+  border-radius: 2px;
+}
+
+/* ── Bottom hint ── */
+#hud-hint {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: .68rem;
+  letter-spacing: 1px;
+  color: #334;
+  pointer-events: none;
+  background: rgba(0,0,0,.4);
+  padding: 4px 14px;
+  border-radius: 2px;
 }
 
 /* ── End screen ── */
@@ -156,19 +169,18 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(3, 3, 16, 0.75);
+  background: rgba(1,1,8,.8);
 }
 #end-box {
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 #end-msg {
-  font-size: 2rem;
-  letter-spacing: 6px;
+  font-size: 2.4rem;
+  letter-spacing: 8px;
   text-transform: uppercase;
   color: #fff;
-  text-shadow: 0 0 20px #00e5ff;
 }

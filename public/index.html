@@ -29,6 +29,10 @@
     <div id="room-code-display"></div>
     <p class="dim">Share this code with friends</p>
     <ul id="player-list"></ul>
+    <div id="bot-controls" style="display:none">
+      <button id="add-bot-btn">+ Add CPU</button>
+      <button id="remove-bot-btn">− Remove CPU</button>
+    </div>
     <button id="start-btn" style="display:none">Start Game</button>
     <p id="waiting-msg" class="dim">Waiting for host to start…</p>
   </div>
@@ -36,10 +40,20 @@
   <!-- ── Game ── -->
   <div id="game-container" style="display:none">
     <canvas id="c"></canvas>
-    <div id="hud">
+
+    <!-- HUD: player list + controls -->
+    <div id="hud-top">
       <div id="hud-players"></div>
-      <div id="hud-dir"></div>
+      <div id="hud-controls">
+        <button id="trail-toggle-btn" class="hud-btn">TRAIL: ON</button>
+        <button id="mute-btn" class="hud-btn">♪ ON</button>
+      </div>
     </div>
+
+    <!-- Controls hint -->
+    <div id="hud-hint">WASD / ARROWS — steer &nbsp;·&nbsp; SPACE — toggle trail &nbsp;·&nbsp; M — mute</div>
+
+    <!-- End screen -->
     <div id="end-screen" style="display:none">
       <div id="end-box">
         <div id="end-msg"></div>
@@ -51,7 +65,8 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
     }
   }
   </script>
