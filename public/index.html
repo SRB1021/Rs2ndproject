@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRON — First Person</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Lobby ── -->
+  <div id="lobby">
+    <h1>TRON</h1>
+    <p class="subtitle">FIRST PERSON LIGHT CYCLES</p>
+    <input id="name-input" type="text" maxlength="16" placeholder="Your name" autocomplete="off" />
+    <div class="lobby-row">
+      <button id="create-btn">Create Game</button>
+    </div>
+    <div class="lobby-row">
+      <input id="code-input" type="text" maxlength="6" placeholder="Room code" autocomplete="off" />
+      <button id="join-btn">Join</button>
+    </div>
+    <div id="lobby-error" class="error"></div>
+  </div>
+
+  <!-- ── Waiting room ── -->
+  <div id="waiting-room" style="display:none">
+    <h2>Room Code</h2>
+    <div id="room-code-display"></div>
+    <p class="dim">Share this code with friends</p>
+    <ul id="player-list"></ul>
+    <button id="start-btn" style="display:none">Start Game</button>
+    <p id="waiting-msg" class="dim">Waiting for host to start…</p>
+  </div>
+
+  <!-- ── Game ── -->
+  <div id="game-container" style="display:none">
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div id="hud-players"></div>
+      <div id="hud-dir"></div>
+    </div>
+    <div id="end-screen" style="display:none">
+      <div id="end-box">
+        <div id="end-msg"></div>
+        <button id="play-again-btn">Back to Lobby</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js"
+    }
+  }
+  </script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
