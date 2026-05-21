@@ -10,7 +10,7 @@ const io = new Server(httpServer);
 app.use(express.static(path.join(__dirname, 'public')));
 
 const GRID    = 64;
-const TICK_MS = 100;
+const TICK_MS = 80;  // ~12 ticks/s — smoother than 100ms
 const MAX_PL  = 4;
 const COLORS  = ['#00e5ff', '#ff1744', '#ffea00', '#00e676'];
 const BOT_NAMES = ['RINZLER', 'CLU', 'SARK', 'MCP'];
