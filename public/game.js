@@ -173,6 +173,8 @@ function updateScene() {
     if (id === myId) {
       if (viewMode === 'first') {
         camera.position.set(wx, CAM_H, wz);
+        camera.rotation.x = -0.05; // enforce tilt every frame so bird's eye can't bleed through
+        camera.rotation.z = 0;
         const target = CAM_ANGLE[p.dir] ?? camAngleY;
         let diff = target - camAngleY;
         while (diff >  Math.PI) diff -= Math.PI * 2;
@@ -294,24 +296,26 @@ socket.on('game-over', data => {
 
 // ── Game init ──────────────────────────────────────────────────────────────
 function startGame(data) {
-  // Clear previous scene objects
   while (scene.children.length) scene.remove(scene.children[0]);
   buildArena(data.gridSize);
 
-  players  = {};
-  lastTick = performance.now();
+  // Reset view state before the loop so mesh.visible and camera are always correct
+  viewMode  = 'first';
+  players   = {};
+  lastTick  = performance.now();
 
   for (const pd of data.players) {
     const mesh = createBike(pd.color);
     mesh.position.set(pd.x, 0, pd.y);
     mesh.rotation.y = BIKE_ROT[pd.dir];
-    mesh.visible = pd.id !== myId || viewMode === 'top';
+    mesh.visible = pd.id !== myId; // always hide own bike in first-person at start
     scene.add(mesh);
 
     if (pd.id === myId) {
-      viewMode  = 'first'; // always start in first-person
-      camAngleY = CAM_ANGLE[pd.dir];
+      camAngleY         = CAM_ANGLE[pd.dir];
+      camera.rotation.x = -0.05; // restore downward tilt
       camera.rotation.y = camAngleY;
+      camera.rotation.z = 0;
     }
 
     players[pd.id] = {
