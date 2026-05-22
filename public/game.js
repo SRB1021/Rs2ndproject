@@ -150,6 +150,7 @@ function buildArena(g) {
 
 // ── Game state ─────────────────────────────────────────────────────────────
 let myId      = null;
+let isHost    = false;
 let players   = {};
 let lastTick  = 0;
 let tickMs    = 80;
@@ -188,10 +189,19 @@ function updateScene() {
 // ── Socket.io ──────────────────────────────────────────────────────────────
 const socket = io();
 
-socket.on('room-created',  d   => showWaiting(d, true));
-socket.on('room-joined',   d   => showWaiting(d, false));
+socket.on('room-created',  d   => { isHost = true;  showWaiting(d, true);  });
+socket.on('room-joined',   d   => { isHost = false; showWaiting(d, false); });
 socket.on('room-error',    msg => { document.getElementById('lobby-error').textContent = msg; });
-socket.on('lobby-update',  d   => refreshPlayerList(d.players));
+socket.on('lobby-update',  d   => {
+  refreshPlayerList(d.players);
+  // When host restarts, bring everyone back to the waiting room
+  if (d.state === 'lobby' && !gameActive &&
+      document.getElementById('game-container').style.display !== 'none') {
+    document.getElementById('game-container').style.display = 'none';
+    document.getElementById('end-screen').style.display     = 'none';
+    showWaiting(d, isHost);
+  }
+});
 
 socket.on('game-start', data => {
   myId   = data.myId;
@@ -268,6 +278,9 @@ socket.on('game-over', data => {
     msg.style.color = '#aaa';
     msg.style.textShadow = 'none';
   }
+  // Show Play Again for host, Leave for guests
+  document.getElementById('play-again-btn').style.display = isHost ? 'inline-block' : 'none';
+  document.getElementById('leave-btn').style.display      = 'inline-block';
   document.getElementById('end-screen').style.display = 'flex';
 });
 
@@ -322,34 +335,35 @@ function startGame(data) {
 }
 
 // ── Input ──────────────────────────────────────────────────────────────────
-const KEY_MAP = {
-  ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT',
-  w: 'UP', s: 'DOWN', a: 'LEFT', d: 'RIGHT',
-  W: 'UP', S: 'DOWN', A: 'LEFT', D: 'RIGHT',
-};
+// Relative turn maps — A/left always turns left from YOUR perspective,
+// D/right always turns right, regardless of absolute grid direction.
+// (Absolute-direction mapping breaks: A=grid-LEFT is blocked when going RIGHT.)
+const TURN_LEFT  = { UP:'LEFT',  LEFT:'DOWN',  DOWN:'RIGHT', RIGHT:'UP'   };
+const TURN_RIGHT = { UP:'RIGHT', RIGHT:'DOWN', DOWN:'LEFT',  LEFT:'UP'    };
 
 document.addEventListener('keydown', e => {
-  if (e.repeat) return; // block key-hold repeats
+  if (e.repeat) return;
 
   if (e.key === 'm' || e.key === 'M') { music.toggleMute(); return; }
 
-  if (e.key === ' ' && gameActive) {
-    e.preventDefault();
-    socket.emit('toggle-trail');
-    return;
-  }
+  if (e.key === ' ' && gameActive) { e.preventDefault(); socket.emit('toggle-trail'); return; }
 
-  const dir = KEY_MAP[e.key];
-  if (!dir || !gameActive) return;
-  e.preventDefault();
-
+  if (!gameActive) return;
   const me = players[myId];
   if (!me || !me.alive) return;
 
-  // Use server-confirmed direction for the 180° reverse guard
-  if (dir === OPP[me.serverDir || me.dir]) return;
+  const cur = me.serverDir || me.dir;
+  let dir = null;
 
-  me.dir = dir; // local prediction — camera responds immediately
+  if      (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') dir = TURN_LEFT[cur];
+  else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = TURN_RIGHT[cur];
+  else if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') dir = cur; // go straight
+  // S / ArrowDown: reverse not allowed in TRON — ignore
+
+  if (!dir || dir === cur) return; // no turn needed
+  e.preventDefault();
+
+  me.dir = dir; // local prediction so camera responds immediately
   socket.emit('turn', { dir });
 });
 
@@ -489,12 +503,17 @@ document.getElementById('add-bot-btn').addEventListener('click',     () => socke
 document.getElementById('remove-bot-btn').addEventListener('click',  () => socket.emit('remove-bot'));
 document.getElementById('trail-toggle-btn').addEventListener('click',() => { if (gameActive) socket.emit('toggle-trail'); });
 document.getElementById('mute-btn').addEventListener('click',        () => music.toggleMute());
-document.getElementById('play-again-btn').addEventListener('click',  () => {
+document.getElementById('play-again-btn').addEventListener('click', () => {
+  // Host restarts: server resets room → triggers lobby-update → all clients see waiting room
+  socket.emit('restart-game');
+});
+document.getElementById('leave-btn').addEventListener('click', () => {
   document.getElementById('end-screen').style.display     = 'none';
   document.getElementById('game-container').style.display = 'none';
   document.getElementById('lobby').style.display          = 'flex';
   gameActive = false;
   myId = null;
+  isHost = false;
 });
 
 // ── Render loop ────────────────────────────────────────────────────────────

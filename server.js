@@ -169,6 +169,12 @@ class Room {
              players:[...this.players.values()].map(p=>({id:p.id,name:p.name,color:p.color,isBot:p.isBot})) };
   }
 
+  restart() {
+    if (this.interval) { clearInterval(this.interval); this.interval = null; }
+    this.state = 'lobby';
+    this.grid  = null;
+  }
+
   destroy() { if (this.interval) clearInterval(this.interval); }
 }
 
@@ -207,6 +213,12 @@ io.on('connection', socket => {
   socket.on('start-game', () => {
     if (!room||room.hostId!==socket.id||room.state!=='lobby') return;
     room.startGame();
+  });
+
+  socket.on('restart-game', () => {
+    if (!room||room.hostId!==socket.id||room.state!=='finished') return;
+    room.restart();
+    io.to(room.code).emit('lobby-update', room.lobby());
   });
 
   socket.on('turn', ({dir}) => { if (room) room.setDir(socket.id,dir); });
