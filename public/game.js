@@ -4,8 +4,9 @@ import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const TRAIL_H = 1.5;
-const CAM_H   = 0.55;
+const TRAIL_H     = 1.5;
+const CAM_H       = 0.55;
+const BIRDS_EYE_H = 30;
 
 // Camera faces -Z by default. These Y-rotations point it toward each direction.
 const CAM_ANGLE = { UP: 0, RIGHT: -Math.PI / 2, DOWN: Math.PI, LEFT: Math.PI / 2 };
@@ -157,6 +158,7 @@ let tickMs    = 80;
 let gameActive = false;
 let trailOn   = true;
 let camAngleY = 0;
+let viewMode  = 'first'; // 'first' | 'top'
 
 // ── Camera + bike interpolation ────────────────────────────────────────────
 function updateScene() {
@@ -169,18 +171,24 @@ function updateScene() {
     const wz = p.prevZ + (p.targetZ - p.prevZ) * t;
 
     if (id === myId) {
-      // First-person camera
-      camera.position.set(wx, CAM_H, wz);
-
-      // Smooth camera rotation — fast lerp (0.8/frame ≈ snaps in ~30 ms)
-      const target = CAM_ANGLE[p.dir] ?? camAngleY;
-      let diff = target - camAngleY;
-      while (diff >  Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      camAngleY += diff * 0.8;
-      camera.rotation.y = camAngleY;
+      if (viewMode === 'first') {
+        camera.position.set(wx, CAM_H, wz);
+        const target = CAM_ANGLE[p.dir] ?? camAngleY;
+        let diff = target - camAngleY;
+        while (diff >  Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        camAngleY += diff * 0.8;
+        camera.rotation.y = camAngleY;
+      } else {
+        // Bird's eye: fixed height, look straight down, own bike visible
+        camera.position.set(wx, BIRDS_EYE_H, wz);
+        camera.rotation.x = -Math.PI / 2;
+        camera.rotation.y = 0;
+        camera.rotation.z = 0;
+        p.mesh.position.set(wx, 0, wz);
+        p.mesh.rotation.y = BIKE_ROT[p.dir];
+      }
     } else {
-      // Interpolate other bikes smoothly too
       p.mesh.position.set(wx, 0, wz);
     }
   }
@@ -297,11 +305,11 @@ function startGame(data) {
     const mesh = createBike(pd.color);
     mesh.position.set(pd.x, 0, pd.y);
     mesh.rotation.y = BIKE_ROT[pd.dir];
-    mesh.visible = pd.id !== myId; // hide own bike (first-person)
+    mesh.visible = pd.id !== myId || viewMode === 'top';
     scene.add(mesh);
 
     if (pd.id === myId) {
-      // Snap camera to starting angle — no lerp from stale state
+      viewMode  = 'first'; // always start in first-person
       camAngleY = CAM_ANGLE[pd.dir];
       camera.rotation.y = camAngleY;
     }
@@ -348,6 +356,22 @@ document.addEventListener('keydown', e => {
 
   if (e.key === ' ' && gameActive) { e.preventDefault(); socket.emit('toggle-trail'); return; }
 
+  if ((e.key === 'c' || e.key === 'C') && gameActive) {
+    viewMode = viewMode === 'first' ? 'top' : 'first';
+    const me = players[myId];
+    if (me && me.mesh) {
+      me.mesh.visible = viewMode === 'top';
+      if (viewMode === 'first') {
+        // Snap camera rotation back to current direction on return
+        camAngleY = CAM_ANGLE[me.dir];
+        camera.rotation.y = camAngleY;
+        camera.rotation.x = -0.05;
+        camera.rotation.z = 0;
+      }
+    }
+    return;
+  }
+
   if (!gameActive) return;
   const me = players[myId];
   if (!me || !me.alive) return;
@@ -377,10 +401,12 @@ function updateTrailBtn() {
   btn.style.boxShadow   = trailOn ? '0 0 8px #00e5ff' : '0 0 8px #ff1744';
 }
 
-// ── Music (128 BPM, B minor — End of Line vibe) ────────────────────────────
+// ── Music (140 BPM techno — 4-on-the-floor, hard bass, synth lead) ──────────
 const music = (() => {
-  let ac = null, master = null, running = false, muted = false, nextBar = 0;
-  const B = 60 / 128;
+  let ac = null, master = null, running = false, muted = false, nextBar = 0, barNum = 0;
+  const BPM = 140;
+  const B = 60 / BPM; // one beat
+  const S = B / 4;    // one 16th note step
 
   function noise(s) {
     const n = Math.ceil(ac.sampleRate * s);
@@ -389,73 +415,139 @@ const music = (() => {
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     return buf;
   }
+
+  // Hard punchy kick with long pitch sweep
   function kick(t) {
     const o = ac.createOscillator(), g = ac.createGain();
     o.connect(g); g.connect(master);
-    o.frequency.setValueAtTime(200, t);
-    o.frequency.exponentialRampToValueAtTime(0.001, t + 0.35);
-    g.gain.setValueAtTime(3, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-    o.start(t); o.stop(t + 0.36);
+    o.frequency.setValueAtTime(220, t);
+    o.frequency.exponentialRampToValueAtTime(0.001, t + 0.55);
+    g.gain.setValueAtTime(5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    o.start(t); o.stop(t + 0.56);
   }
-  function snare(t) {
-    const s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
-    s.buffer = noise(0.18); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 0.7;
-    s.connect(bp); bp.connect(g); g.connect(master);
-    g.gain.setValueAtTime(0.7, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    s.start(t); s.stop(t + 0.19);
+
+  // Crisp electronic clap (layered noise bursts)
+  function clap(t) {
+    for (let i = 0; i < 3; i++) {
+      const s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+      s.buffer = noise(0.13); bp.type = 'bandpass'; bp.frequency.value = 1800 + i * 300; bp.Q.value = 0.5;
+      s.connect(bp); bp.connect(g); g.connect(master);
+      g.gain.setValueAtTime(0.65 - i * 0.15, t + i * 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.012 + 0.13);
+      s.start(t + i * 0.012); s.stop(t + i * 0.012 + 0.14);
+    }
   }
-  function hihat(t, v) {
+
+  // Closed hi-hat
+  function hat(t, v) {
     const s = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain();
-    s.buffer = noise(0.05); hp.type = 'highpass'; hp.frequency.value = 9000;
+    s.buffer = noise(0.035); hp.type = 'highpass'; hp.frequency.value = 11000;
     s.connect(hp); hp.connect(g); g.connect(master);
-    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-    s.start(t); s.stop(t + 0.05);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+    s.start(t); s.stop(t + 0.04);
   }
+
+  // Open hi-hat (sustains)
+  function openHat(t) {
+    const s = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noise(0.22); hp.type = 'highpass'; hp.frequency.value = 8500;
+    s.connect(hp); hp.connect(g); g.connect(master);
+    g.gain.setValueAtTime(0.38, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    s.start(t); s.stop(t + 0.22);
+  }
+
+  // Driving sawtooth bass with resonant filter sweep
   function bass(t, freq, dur) {
     const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
     o.type = 'sawtooth'; o.frequency.value = freq;
-    f.type = 'lowpass'; f.Q.value = 6;
-    f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(180, t + dur);
+    f.type = 'lowpass'; f.Q.value = 12;
+    f.frequency.setValueAtTime(2000, t);
+    f.frequency.exponentialRampToValueAtTime(150, t + dur * 0.55);
     o.connect(f); f.connect(g); g.connect(master);
-    g.gain.setValueAtTime(1.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    g.gain.setValueAtTime(1.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.start(t); o.stop(t + dur + 0.01);
   }
-  function arp(t, freq, dur) {
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = 'square'; o.frequency.value = freq;
-    o.connect(g); g.connect(master);
-    g.gain.setValueAtTime(0.07, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.start(t); o.stop(t + dur + 0.01);
+
+  // Short punchy synth stab chord
+  function stab(t, freqs) {
+    freqs.forEach(freq => {
+      const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = 'sawtooth'; o.frequency.value = freq;
+      f.type = 'lowpass'; f.frequency.value = 2800; f.Q.value = 3;
+      o.connect(f); f.connect(g); g.connect(master);
+      g.gain.setValueAtTime(0.11, t); g.gain.exponentialRampToValueAtTime(0.001, t + B * 0.35);
+      o.start(t); o.stop(t + B * 0.36);
+    });
   }
-  function scheduleBar(t) {
+
+  // Detuned square lead (two oscs slightly apart for width)
+  function lead(t, freq, dur) {
+    [0, 3].forEach(detune => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'square'; o.frequency.value = freq * (1 + detune * 0.001);
+      o.connect(g); g.connect(master);
+      g.gain.setValueAtTime(0.065, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.start(t); o.stop(t + dur + 0.01);
+    });
+  }
+
+  // B minor: B=61.74/123.47/246.94 D=73.42/146.83/293.66 F#=92.50/185/369.99
+  //          A=110/220/440 E=82.41/164.81/329.63
+  function scheduleBar(t, n) {
+    // 4-on-the-floor kick
     for (let i = 0; i < 4; i++) kick(t + i * B);
-    snare(t + B); snare(t + 3 * B);
-    for (let i = 0; i < 16; i++) hihat(t + i * B / 4, i % 4 === 0 ? 0.4 : i % 2 === 0 ? 0.25 : 0.12);
-    [[0, 61.74], [1, 73.42], [2, 92.50], [2.5, 82.41], [3, 73.42], [3.5, 61.74]]
-      .forEach(([dt, f]) => bass(t + dt * B, f, B * 0.42));
-    const A = [246.94, 293.66, 369.99, 440, 246.94, 369.99, 440, 523.25,
-               246.94, 293.66, 369.99, 440, 523.25, 440,    369.99, 293.66];
-    for (let i = 0; i < 16; i++) arp(t + i * B / 4, A[i], B / 4 * 0.65);
+
+    // Clap on 2 and 4
+    clap(t + B); clap(t + 3 * B);
+
+    // 16th-note hats + open hat on offbeats
+    for (let i = 0; i < 16; i++) {
+      if (i === 6 || i === 14) openHat(t + i * S);
+      else hat(t + i * S, i % 4 === 0 ? 0.55 : i % 2 === 0 ? 0.3 : 0.14);
+    }
+
+    // Driving bass: 16th-note pattern in B minor
+    [
+      [0, 61.74, 0.20], [0.5, 61.74, 0.13], [0.75, 73.42, 0.13],
+      [1,  61.74, 0.20], [1.5, 92.50, 0.25],
+      [2,  82.41, 0.20], [2.5, 73.42, 0.13], [2.75, 61.74, 0.13],
+      [3,  61.74, 0.20], [3.5, 92.50, 0.13], [3.75, 82.41, 0.13],
+    ].forEach(([dt, f, d]) => bass(t + dt * B, f, d * B));
+
+    // Stab chords on the "and" of every other bar (adds energy)
+    if (n % 2 === 1) {
+      stab(t + 1.5 * B, [246.94, 293.66, 369.99]);
+      stab(t + 3.5 * B, [246.94, 293.66, 369.99]);
+    }
+
+    // 16th-note synth lead (B minor scale, ascending + descending pattern)
+    const LEAD = [
+      493.88, 587.33, 659.26, 739.99, 659.26, 587.33, 493.88, 440.00,
+      493.88, 659.26, 739.99, 880.00, 739.99, 659.26, 587.33, 493.88,
+    ];
+    for (let i = 0; i < 16; i++) lead(t + i * S, LEAD[i], S * 0.6);
   }
+
   function pump() {
     if (!running) return;
-    while (nextBar < ac.currentTime + 0.8) { scheduleBar(nextBar); nextBar += B * 4; }
+    while (nextBar < ac.currentTime + 0.8) { scheduleBar(nextBar, barNum++); nextBar += B * 4; }
     setTimeout(pump, 200);
   }
+
   return {
     start() {
       if (running) return;
       ac = new (window.AudioContext || window.webkitAudioContext)();
-      master = ac.createGain(); master.gain.value = 0.35;
+      master = ac.createGain(); master.gain.value = 0.32;
       master.connect(ac.destination);
-      running = true; nextBar = ac.currentTime + 0.05;
+      running = true; barNum = 0; nextBar = ac.currentTime + 0.05;
       pump();
     },
     stop()  { running = false; if (ac) { ac.close(); ac = null; } },
     toggleMute() {
       muted = !muted;
-      if (master) master.gain.value = muted ? 0 : 0.35;
+      if (master) master.gain.value = muted ? 0 : 0.32;
       const btn = document.getElementById('mute-btn');
       if (btn) btn.textContent = muted ? '♪ OFF' : '♪ ON';
     },
