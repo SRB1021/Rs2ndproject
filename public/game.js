@@ -7,22 +7,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 const TRAIL_H = 1.5;
 const CAM_H   = 0.55;
 
-// Camera Y-rotation for each direction (camera default faces -Z = UP in grid)
-const CAM_ANGLE = { UP: 0, RIGHT: -Math.PI/2, DOWN: Math.PI, LEFT: Math.PI/2 };
-
-// World-space forward vector per direction
-const DIR_VEC = {
-  RIGHT: [1, 0], LEFT: [-1, 0], DOWN: [0, 1], UP: [0, -1],
-};
-
-// Bike group Y-rotation so nose (model faces -Z) points toward travel dir
-const BIKE_ROT = { UP: 0, RIGHT: -Math.PI/2, DOWN: Math.PI, LEFT: Math.PI/2 };
-
-const OPP = { UP:'DOWN', DOWN:'UP', LEFT:'RIGHT', RIGHT:'LEFT' };
+// Camera faces -Z by default. These Y-rotations point it toward each direction.
+const CAM_ANGLE = { UP: 0, RIGHT: -Math.PI / 2, DOWN: Math.PI, LEFT: Math.PI / 2 };
+const BIKE_ROT  = { UP: 0, RIGHT: -Math.PI / 2, DOWN: Math.PI, LEFT: Math.PI / 2 };
+const OPP       = { UP: 'DOWN', DOWN: 'UP', LEFT: 'RIGHT', RIGHT: 'LEFT' };
 
 // ── Renderer ───────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ReinhardToneMapping;
 renderer.toneMappingExposure = 1.2;
@@ -31,15 +23,17 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x010108);
 scene.fog = new THREE.Fog(0x010108, 14, 75);
 
-// FPS camera — rotation order YXZ prevents gimbal lock for first-person
+// FPS camera — YXZ order prevents gimbal lock for first-person
 const camera = new THREE.PerspectiveCamera(80, 1, 0.05, 200);
 camera.rotation.order = 'YXZ';
-camera.rotation.x = -0.05; // very slight downward tilt
+camera.rotation.x = -0.05; // subtle downward tilt
 
-// Bloom post-processing (the TRON glow)
+// Bloom — gives all neon objects the TRON glow
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.5, 0.5, 0.05);
+const bloom = new UnrealBloomPass(
+  new THREE.Vector2(innerWidth, innerHeight), 1.5, 0.5, 0.05
+);
 composer.addPass(bloom);
 
 function resize() {
@@ -54,42 +48,44 @@ window.addEventListener('resize', resize);
 // ── TRON Legacy bike model ─────────────────────────────────────────────────
 function createBike(hexColor) {
   const group = new THREE.Group();
-  const col  = new THREE.Color(hexColor);
-  const dark = () => new THREE.MeshBasicMaterial({ color: 0x060612 });
-  const glow = () => new THREE.MeshBasicMaterial({ color: col });
-  const glass= () => new THREE.MeshBasicMaterial({ color: 0x001c38, transparent: true, opacity: 0.9 });
+  const col   = new THREE.Color(hexColor);
+  const dark  = () => new THREE.MeshBasicMaterial({ color: 0x060612 });
+  const glow  = () => new THREE.MeshBasicMaterial({ color: col });
+  const glass = () => new THREE.MeshBasicMaterial({ color: 0x001c38, transparent: true, opacity: 0.9 });
 
-  function part(w, h, d, mat, x=0, y=0, z=0, rx=0, ry=0, rz=0) {
+  function part(w, h, d, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
     m.rotation.set(rx, ry, rz);
     group.add(m);
   }
 
-  // Body
-  part(0.56, 0.13, 1.80, dark(),  0, 0.13,  0);       // lower chassis
-  part(0.36, 0.17, 1.32, dark(),  0, 0.32,  0.04);    // upper fairing
-  part(0.28, 0.13, 0.58, glass(), 0, 0.46, -0.10);    // cockpit
+  // Body panels
+  part(0.56, 0.13, 1.80, dark(),  0, 0.13,  0);
+  part(0.36, 0.17, 1.32, dark(),  0, 0.32,  0.04);
+  part(0.28, 0.13, 0.58, glass(), 0, 0.46, -0.10);
 
   // Glow trim
-  part(0.58, 0.022, 1.82, glow(),  0,    0.022, 0);   // bottom edge
-  part(0.38, 0.022, 1.34, glow(),  0,    0.412, 0.04);// top edge
-  part(0.022, 0.15, 1.82, glow(), -0.29, 0.13,  0);   // left strip
-  part(0.022, 0.15, 1.82, glow(),  0.29, 0.13,  0);   // right strip
-  part(0.58, 0.15, 0.022, glow(),  0,    0.13, -0.91);// front glow
-  part(0.58, 0.15, 0.022, glow(),  0,    0.13,  0.91);// rear (trail source)
+  part(0.58, 0.022, 1.82, glow(),  0,     0.022, 0);
+  part(0.38, 0.022, 1.34, glow(),  0,     0.412, 0.04);
+  part(0.022, 0.15, 1.82, glow(), -0.29,  0.13,  0);
+  part(0.022, 0.15, 1.82, glow(),  0.29,  0.13,  0);
+  part(0.58, 0.15, 0.022, glow(),  0,     0.13, -0.91);
+  part(0.58, 0.15, 0.022, glow(),  0,     0.13,  0.91);
 
-  // Wheel
+  // Wheel disc
   const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.07, 28), dark());
   wheel.rotation.z = Math.PI / 2;
   wheel.position.set(0, 0.23, 0.1);
   group.add(wheel);
 
+  // Wheel rim glow
   const rim = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.018, 8, 28), glow());
   rim.rotation.y = Math.PI / 2;
   rim.position.set(0, 0.23, 0.1);
   group.add(rim);
 
+  // Spokes
   for (let i = 0; i < 4; i++) {
     part(0.014, 0.46, 0.014, glow(), 0, 0.23, 0.1, (i / 4) * Math.PI, 0, 0);
   }
@@ -98,6 +94,7 @@ function createBike(hexColor) {
 }
 
 // ── Trail wall ─────────────────────────────────────────────────────────────
+// Thin flat wall, oriented along the direction of travel (TRON Legacy style)
 function makeWall(hexColor, dir) {
   const isX = dir === 'RIGHT' || dir === 'LEFT';
   const geo  = new THREE.BoxGeometry(isX ? 1.0 : 0.08, TRAIL_H, isX ? 0.08 : 1.0);
@@ -111,15 +108,19 @@ function buildArena(g) {
   GRID = g;
   const cx = g / 2, cz = g / 2;
 
-  // Floor
-  scene.add(Object.assign(
-    new THREE.Mesh(new THREE.PlaneGeometry(g + 2, g + 2), new THREE.MeshBasicMaterial({ color: 0x010108 })),
-    { rotation: { x: -Math.PI / 2 }, position: new THREE.Vector3(cx, 0, cz) }
-  ));
+  // Floor — plain Three.js API, no Object.assign shortcuts that break Euler
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(g + 2, g + 2),
+    new THREE.MeshBasicMaterial({ color: 0x010108 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(cx, 0, cz);
+  scene.add(floor);
 
-  // Primary grid lines — bright enough to bloom
-  const addGrid = (step, color) => {
-    const pts = [], n = Math.round(g / step);
+  // TRON Legacy grid lines (primary + fine sub-grid)
+  function addGrid(step, color) {
+    const pts = [];
+    const n   = Math.round(g / step);
     for (let i = 0; i <= n; i++) {
       const v = i * step;
       pts.push(v, 0.003, 0,  v, 0.003, g);
@@ -128,49 +129,60 @@ function buildArena(g) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color })));
-  };
-  addGrid(1,   0x0033bb); // main grid
-  addGrid(0.5, 0x001155); // fine grid
+  }
+  addGrid(1,   0x0033bb); // primary
+  addGrid(0.5, 0x001155); // sub-grid
 
   // Border walls
-  const wm = new THREE.MeshBasicMaterial({ color: 0x0055ff });
+  const wallMat = new THREE.MeshBasicMaterial({ color: 0x0055ff });
   const wh = 3.2;
   [
-    [[g + 1, wh, 0.1 ], [cx,      wh / 2, -0.05 ]],
-    [[g + 1, wh, 0.1 ], [cx,      wh / 2,  g + 0.05]],
-    [[0.1,   wh, g + 1], [-0.05,   wh / 2,  cz   ]],
-    [[0.1,   wh, g + 1], [g + 0.05, wh / 2, cz   ]],
-  ].forEach(([size, pos]) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(...size), wm);
-    m.position.set(...pos);
+    [g + 1, wh, 0.1,   cx,       wh / 2, -0.05],
+    [g + 1, wh, 0.1,   cx,       wh / 2,  g + 0.05],
+    [0.1,   wh, g + 1, -0.05,    wh / 2,  cz],
+    [0.1,   wh, g + 1,  g + 0.05, wh / 2, cz],
+  ].forEach(([w, h, d, x, y, z]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    m.position.set(x, y, z);
     scene.add(m);
   });
 }
 
 // ── Game state ─────────────────────────────────────────────────────────────
-let myId = null, players = {}, lastTick = 0, tickMs = 80, gameActive = false;
-let trailOn  = true;
-let camAngleY = 0; // smoothly interpolated camera Y rotation
+let myId      = null;
+let players   = {};
+let lastTick  = 0;
+let tickMs    = 80;
+let gameActive = false;
+let trailOn   = true;
+let camAngleY = 0;
 
-// ── Camera — smooth angle interpolation, no lookAt snapping ────────────────
-function updateCamera() {
-  const me = players[myId];
-  if (!me || !me.alive) return;
+// ── Camera + bike interpolation ────────────────────────────────────────────
+function updateScene() {
+  const t = Math.min(1, (performance.now() - lastTick) / tickMs);
 
-  // ── Position: smooth tick-to-tick (no jump when tick arrives early) ──────
-  const t  = Math.min(1, (performance.now() - lastTick) / tickMs);
-  const wx = me.prevX + (me.targetX - me.prevX) * t;
-  const wz = me.prevZ + (me.targetZ - me.prevZ) * t;
-  camera.position.set(wx, CAM_H, wz);
+  for (const [id, p] of Object.entries(players)) {
+    if (!p.alive) continue;
 
-  // ── Rotation: smoothly chase target angle (factor 0.75/frame ≈ 30ms snap) ─
-  const target = CAM_ANGLE[me.dir];
-  let diff = target - camAngleY;
-  // Wrap difference to [-π, π] so we always take the short arc
-  while (diff >  Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-  camAngleY += diff * 0.75;
-  camera.rotation.y = camAngleY;
+    const wx = p.prevX + (p.targetX - p.prevX) * t;
+    const wz = p.prevZ + (p.targetZ - p.prevZ) * t;
+
+    if (id === myId) {
+      // First-person camera
+      camera.position.set(wx, CAM_H, wz);
+
+      // Smooth camera rotation — fast lerp (0.8/frame ≈ snaps in ~30 ms)
+      const target = CAM_ANGLE[p.dir] ?? camAngleY;
+      let diff = target - camAngleY;
+      while (diff >  Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      camAngleY += diff * 0.8;
+      camera.rotation.y = camAngleY;
+    } else {
+      // Interpolate other bikes smoothly too
+      p.mesh.position.set(wx, 0, wz);
+    }
+  }
 }
 
 // ── Socket.io ──────────────────────────────────────────────────────────────
@@ -182,7 +194,7 @@ socket.on('room-error',    msg => { document.getElementById('lobby-error').textC
 socket.on('lobby-update',  d   => refreshPlayerList(d.players));
 
 socket.on('game-start', data => {
-  myId = data.myId;
+  myId   = data.myId;
   tickMs = data.tickMs;
   trailOn = true;
   startGame(data);
@@ -197,7 +209,7 @@ socket.on('tick', data => {
     const p = players[pd.id];
     if (!p) continue;
 
-    // Trail wall at position bike just left
+    // Place trail wall at the cell the bike just left
     if (pd.newTrail && p.alive) {
       const wall = makeWall(p.color, pd.dir);
       wall.position.set(pd.newTrail.x, TRAIL_H / 2, pd.newTrail.y);
@@ -205,24 +217,32 @@ socket.on('tick', data => {
       p.trailMeshes.push(wall);
     }
 
-    // FIX: save current VISUAL position (not old target) as new prevX/Z
-    // This prevents a jump when a tick arrives before t=1 completes
-    const elapsed = now - lastTick;
-    const tNow = Math.min(1, elapsed / tickMs);
-    p.prevX = p.prevX + (p.targetX - p.prevX) * tNow;
-    p.prevZ = p.prevZ + (p.targetZ - p.prevZ) * tNow;
+    // ── Smooth corner fix ───────────────────────────────────────────────────
+    // On a straight segment: start from current visual position (no jump).
+    // On a turn: snap prevX/Z to the exact grid corner — otherwise the
+    // interpolation takes a diagonal path through the corner (looks glitchy).
+    const turned = p.dir !== pd.dir;
+    if (turned) {
+      // Bike just turned: align to exact corner before interpolating new dir
+      p.prevX = p.targetX;
+      p.prevZ = p.targetZ;
+    } else {
+      // Straight: continue from wherever the camera already is visually
+      const tNow = Math.min(1, (now - lastTick) / tickMs);
+      p.prevX = p.prevX + (p.targetX - p.prevX) * tNow;
+      p.prevZ = p.prevZ + (p.targetZ - p.prevZ) * tNow;
+    }
 
-    p.targetX = pd.x;
-    p.targetZ = pd.y;
-    p.serverDir = pd.dir; // server-confirmed direction (used for OPP check)
-    p.dir = pd.dir;       // also update local dir to keep in sync
-    p.alive = pd.alive;
+    p.targetX   = pd.x;
+    p.targetZ   = pd.y;
+    p.dir       = pd.dir;
+    p.serverDir = pd.dir;
+    p.alive     = pd.alive;
 
     if (!pd.alive) {
       p.mesh.visible = false;
       document.getElementById('chip-' + pd.id)?.classList.add('dead');
     } else if (pd.id !== myId) {
-      p.mesh.position.set(pd.x, 0, pd.y);
       p.mesh.rotation.y = BIKE_ROT[pd.dir];
     }
   }
@@ -240,8 +260,8 @@ socket.on('game-over', data => {
   music.stop();
   const msg = document.getElementById('end-msg');
   if (data.winner) {
-    msg.textContent    = data.winner.id === myId ? 'YOU WIN' : data.winner.name + ' WINS';
-    msg.style.color    = data.winner.color;
+    msg.textContent      = data.winner.id === myId ? 'YOU WIN' : data.winner.name + ' WINS';
+    msg.style.color      = data.winner.color;
     msg.style.textShadow = `0 0 20px ${data.winner.color}`;
   } else {
     msg.textContent = 'DRAW';
@@ -253,33 +273,35 @@ socket.on('game-over', data => {
 
 // ── Game init ──────────────────────────────────────────────────────────────
 function startGame(data) {
+  // Clear previous scene objects
   while (scene.children.length) scene.remove(scene.children[0]);
   buildArena(data.gridSize);
-  players = {};
+
+  players  = {};
   lastTick = performance.now();
 
   for (const pd of data.players) {
     const mesh = createBike(pd.color);
     mesh.position.set(pd.x, 0, pd.y);
     mesh.rotation.y = BIKE_ROT[pd.dir];
-    mesh.visible = pd.id !== myId; // first-person: hide own bike
+    mesh.visible = pd.id !== myId; // hide own bike (first-person)
     scene.add(mesh);
 
-    // Snap camera to starting direction (no lerp from stale angle)
     if (pd.id === myId) {
+      // Snap camera to starting angle — no lerp from stale state
       camAngleY = CAM_ANGLE[pd.dir];
       camera.rotation.y = camAngleY;
     }
 
     players[pd.id] = {
       color: pd.color, dir: pd.dir, serverDir: pd.dir,
-      targetX: pd.x,  targetZ: pd.y,
-      prevX:   pd.x,  prevZ:   pd.y,
+      targetX: pd.x, targetZ: pd.y,
+      prevX:   pd.x, prevZ:   pd.y,
       mesh, trailMeshes: [], alive: true,
     };
   }
 
-  // HUD chips
+  // Build HUD player chips
   const hp = document.getElementById('hud-players');
   hp.innerHTML = '';
   for (const pd of data.players) {
@@ -301,18 +323,16 @@ function startGame(data) {
 
 // ── Input ──────────────────────────────────────────────────────────────────
 const KEY_MAP = {
-  ArrowUp:'UP', ArrowDown:'DOWN', ArrowLeft:'LEFT', ArrowRight:'RIGHT',
-  w:'UP', s:'DOWN', a:'LEFT', d:'RIGHT',
-  W:'UP', S:'DOWN', A:'LEFT', D:'RIGHT',
+  ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT',
+  w: 'UP', s: 'DOWN', a: 'LEFT', d: 'RIGHT',
+  W: 'UP', S: 'DOWN', A: 'LEFT', D: 'RIGHT',
 };
 
 document.addEventListener('keydown', e => {
-  if (e.repeat) return; // ignore key-hold repeats
+  if (e.repeat) return; // block key-hold repeats
 
-  // Mute
   if (e.key === 'm' || e.key === 'M') { music.toggleMute(); return; }
 
-  // Trail toggle — Space only
   if (e.key === ' ' && gameActive) {
     e.preventDefault();
     socket.emit('toggle-trail');
@@ -326,31 +346,30 @@ document.addEventListener('keydown', e => {
   const me = players[myId];
   if (!me || !me.alive) return;
 
-  // Use server-confirmed direction for the reverse-move guard
-  const confirmDir = me.serverDir || me.dir;
-  if (dir === OPP[confirmDir]) return;
+  // Use server-confirmed direction for the 180° reverse guard
+  if (dir === OPP[me.serverDir || me.dir]) return;
 
-  me.dir = dir;             // local prediction: camera rotates immediately
+  me.dir = dir; // local prediction — camera responds immediately
   socket.emit('turn', { dir });
 });
 
-// ── Trail button ───────────────────────────────────────────────────────────
+// ── Trail HUD button ───────────────────────────────────────────────────────
 function updateTrailBtn() {
   const btn = document.getElementById('trail-toggle-btn');
   if (!btn) return;
-  btn.textContent     = trailOn ? 'TRAIL: ON' : 'TRAIL: OFF';
+  btn.textContent      = trailOn ? 'TRAIL: ON' : 'TRAIL: OFF';
   btn.style.borderColor = trailOn ? '#00e5ff' : '#ff1744';
   btn.style.color       = trailOn ? '#00e5ff' : '#ff1744';
   btn.style.boxShadow   = trailOn ? '0 0 8px #00e5ff' : '0 0 8px #ff1744';
 }
 
-// ── Synthesized music (End of Line vibe — 128 BPM, B minor) ───────────────
+// ── Music (128 BPM, B minor — End of Line vibe) ────────────────────────────
 const music = (() => {
   let ac = null, master = null, running = false, muted = false, nextBar = 0;
-  const B = 60 / 128; // beat duration at 128 BPM
+  const B = 60 / 128;
 
   function noise(s) {
-    const n = Math.ceil((ac?.sampleRate ?? 44100) * s);
+    const n = Math.ceil(ac.sampleRate * s);
     const buf = ac.createBuffer(1, n, ac.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
@@ -399,10 +418,10 @@ const music = (() => {
     for (let i = 0; i < 4; i++) kick(t + i * B);
     snare(t + B); snare(t + 3 * B);
     for (let i = 0; i < 16; i++) hihat(t + i * B / 4, i % 4 === 0 ? 0.4 : i % 2 === 0 ? 0.25 : 0.12);
-    [[0,61.74],[1,73.42],[2,92.50],[2.5,82.41],[3,73.42],[3.5,61.74]]
+    [[0, 61.74], [1, 73.42], [2, 92.50], [2.5, 82.41], [3, 73.42], [3.5, 61.74]]
       .forEach(([dt, f]) => bass(t + dt * B, f, B * 0.42));
-    const A = [246.94,293.66,369.99,440,246.94,369.99,440,523.25,
-               246.94,293.66,369.99,440,523.25,440,369.99,293.66];
+    const A = [246.94, 293.66, 369.99, 440, 246.94, 369.99, 440, 523.25,
+               246.94, 293.66, 369.99, 440, 523.25, 440,    369.99, 293.66];
     for (let i = 0; i < 16; i++) arp(t + i * B / 4, A[i], B / 4 * 0.65);
   }
   function pump() {
@@ -419,7 +438,7 @@ const music = (() => {
       running = true; nextBar = ac.currentTime + 0.05;
       pump();
     },
-    stop() { running = false; if (ac) { ac.close(); ac = null; } },
+    stop()  { running = false; if (ac) { ac.close(); ac = null; } },
     toggleMute() {
       muted = !muted;
       if (master) master.gain.value = muted ? 0 : 0.35;
@@ -465,22 +484,23 @@ document.getElementById('join-btn').addEventListener('click', () => {
 document.getElementById('code-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('join-btn').click();
 });
-document.getElementById('start-btn').addEventListener('click', () => socket.emit('start-game'));
-document.getElementById('add-bot-btn').addEventListener('click', () => socket.emit('add-bot'));
-document.getElementById('remove-bot-btn').addEventListener('click', () => socket.emit('remove-bot'));
-document.getElementById('trail-toggle-btn').addEventListener('click', () => { if (gameActive) socket.emit('toggle-trail'); });
-document.getElementById('mute-btn').addEventListener('click', () => music.toggleMute());
-document.getElementById('play-again-btn').addEventListener('click', () => {
+document.getElementById('start-btn').addEventListener('click',       () => socket.emit('start-game'));
+document.getElementById('add-bot-btn').addEventListener('click',     () => socket.emit('add-bot'));
+document.getElementById('remove-bot-btn').addEventListener('click',  () => socket.emit('remove-bot'));
+document.getElementById('trail-toggle-btn').addEventListener('click',() => { if (gameActive) socket.emit('toggle-trail'); });
+document.getElementById('mute-btn').addEventListener('click',        () => music.toggleMute());
+document.getElementById('play-again-btn').addEventListener('click',  () => {
   document.getElementById('end-screen').style.display     = 'none';
   document.getElementById('game-container').style.display = 'none';
   document.getElementById('lobby').style.display          = 'flex';
-  gameActive = false; myId = null;
+  gameActive = false;
+  myId = null;
 });
 
 // ── Render loop ────────────────────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
-  if (gameActive) updateCamera();
+  if (gameActive) updateScene();
   composer.render();
 }
 animate();
