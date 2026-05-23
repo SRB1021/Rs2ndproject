@@ -3,6 +3,9 @@ import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
+// Must match server COLORS array exactly
+const COLORS = ['#00e5ff', '#ff1744', '#ffea00', '#00e676'];
+
 // ── Constants ──────────────────────────────────────────────────────────────
 const TRAIL_H     = 1.5;
 const CAM_H       = 0.55;
@@ -595,6 +598,35 @@ function refreshPlayerList(list) {
     li.style.color = p.color;
     li.textContent = (p.isBot ? '[CPU] ' : '') + p.name;
     ul.appendChild(li);
+  }
+  updateColorSwatches(list);
+}
+
+function updateColorSwatches(list) {
+  const wrap = document.getElementById('color-swatches');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const hex of COLORS) {
+    const owner = list.find(p => p.color === hex);
+    const isMe    = owner?.id === socket.id;
+    const isTaken = owner && !isMe;
+
+    const div = document.createElement('div');
+    div.className = 'color-swatch' + (isMe ? ' mine' : '') + (isTaken ? ' taken' : '');
+    div.style.background = hex;
+    div.style.setProperty('--sw-color', hex);
+
+    if (isTaken) {
+      const label = document.createElement('span');
+      label.className = 'swatch-owner';
+      label.textContent = owner.name;
+      div.appendChild(label);
+    }
+
+    if (!isTaken) {
+      div.addEventListener('click', () => socket.emit('pick-color', { color: hex }));
+    }
+    wrap.appendChild(div);
   }
 }
 

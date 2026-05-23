@@ -71,11 +71,13 @@ class Room {
   constructor(code) {
     this.code=code; this.players=new Map(); this.hostId=null;
     this.state='lobby'; this.grid=null; this.interval=null;
-    this.colorIdx=0; this.botCount=0;
+    this.botCount=0;
   }
 
   _mkPlayer(id, name, isBot) {
-    return { id, name, color:COLORS[this.colorIdx++%COLORS.length],
+    const used = new Set([...this.players.values()].map(p => p.color));
+    const color = COLORS.find(c => !used.has(c)) || COLORS[0];
+    return { id, name, color,
              x:0, y:0, dir:'RIGHT', nextDir:'RIGHT',
              alive:true, trail:[], trailActive:true, isBot };
   }
@@ -250,6 +252,16 @@ io.on('connection', socket => {
   });
 
   socket.on('turn', ({dir}) => { if (room) room.setDir(socket.id,dir); });
+
+  socket.on('pick-color', ({color}) => {
+    if (!room || room.state !== 'lobby' || !COLORS.includes(color)) return;
+    const p = room.players.get(socket.id);
+    if (!p || p.isBot || p.color === color) return;
+    const taken = [...room.players.values()].some(q => q.id !== socket.id && q.color === color);
+    if (taken) return;
+    p.color = color;
+    io.to(room.code).emit('lobby-update', room.lobby());
+  });
 
   socket.on('toggle-trail', () => {
     if (!room) return;

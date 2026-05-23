@@ -75,6 +75,51 @@ button:hover { background: rgba(0,229,255,.1); box-shadow: 0 0 12px #00e5ff; }
 /* ── Waiting room ── */
 #waiting-room h2 { font-size: .9rem; letter-spacing: 4px; color: #445; text-transform: uppercase; }
 
+/* ── Color picker ── */
+#color-picker {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+#color-swatches { display: flex; gap: 10px; }
+
+.color-swatch {
+  width: 52px;
+  height: 52px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+  transition: transform .12s, border-color .12s, opacity .12s, box-shadow .12s;
+}
+.color-swatch.mine {
+  border-color: #fff;
+  transform: scale(1.18);
+  box-shadow: 0 0 14px var(--sw-color);
+}
+.color-swatch.taken { opacity: .3; cursor: not-allowed; }
+.color-swatch:not(.taken):not(.mine):hover { transform: scale(1.1); }
+
+.swatch-owner {
+  font-size: .5rem;
+  font-family: 'Courier New', monospace;
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  padding: 1px 3px;
+  border-radius: 1px;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
 #room-code-display {
   font-size: 3rem;
   letter-spacing: 12px;
