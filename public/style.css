@@ -184,3 +184,84 @@ button:hover { background: rgba(0,229,255,.1); box-shadow: 0 0 12px #00e5ff; }
   text-transform: uppercase;
   color: #fff;
 }
+
+/* ── Pause overlay ── */
+#pause-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(1, 1, 8, .78);
+  z-index: 20;
+}
+#pause-box {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+#pause-label {
+  font-size: 2.8rem;
+  letter-spacing: 14px;
+  color: #00e5ff;
+  text-shadow: 0 0 24px #00e5ff, 0 0 48px #00e5ff;
+}
+
+/* ── Mobile on-screen turn/pause buttons ── */
+#mobile-btns {
+  position: fixed;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  z-index: 15;
+  pointer-events: none;
+}
+.mb-btn {
+  pointer-events: auto;
+  width: 72px;
+  height: 72px;
+  font-size: 1.5rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .65);
+  border: 1px solid #00e5ff44;
+  color: #00e5ff;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .08s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mb-btn:active { background: rgba(0, 229, 255, .2); }
+
+/* Only show mobile buttons on touch/stylus devices */
+@media (hover: hover) and (pointer: fine) {
+  #mobile-btns { display: none !important; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 500px) {
+  h1 { font-size: 2.6rem; letter-spacing: 8px; }
+  #lobby, #waiting-room { width: 94%; gap: 12px; }
+  #room-code-display { font-size: 2.2rem; letter-spacing: 8px; }
+  button { padding: 12px 18px; }
+
+  #hud-top { gap: 6px; flex-wrap: wrap; justify-content: center; top: 8px; }
+  #hud-players { gap: 4px; flex-wrap: wrap; justify-content: center; }
+  .hud-chip { font-size: .6rem; padding: 3px 7px; }
+  .hud-btn  { font-size: .6rem; padding: 3px 7px; }
+
+  /* Push hint above the mobile buttons */
+  #hud-hint { bottom: 102px; font-size: .58rem; }
+  #hud-hint::after { content: ' · swipe to turn'; }
+
+  #end-msg  { font-size: 1.8rem; letter-spacing: 5px; }
+  #pause-label { font-size: 2rem; letter-spacing: 8px; }
+}

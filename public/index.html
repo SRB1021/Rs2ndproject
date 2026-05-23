@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>TRON — First Person</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -46,12 +46,13 @@
       <div id="hud-players"></div>
       <div id="hud-controls">
         <button id="trail-toggle-btn" class="hud-btn">TRAIL: ON</button>
+        <button id="pause-btn" class="hud-btn">⏸</button>
         <button id="mute-btn" class="hud-btn">♪ ON</button>
       </div>
     </div>
 
     <!-- Controls hint -->
-    <div id="hud-hint">A/D or ←/→ — turn &nbsp;·&nbsp; SPACE — trail &nbsp;·&nbsp; C — view &nbsp;·&nbsp; M — mute</div>
+    <div id="hud-hint">A/D or ←/→ — turn &nbsp;·&nbsp; SPACE — trail &nbsp;·&nbsp; C — view &nbsp;·&nbsp; P — pause &nbsp;·&nbsp; M — mute</div>
 
     <!-- End screen -->
     <div id="end-screen" style="display:none">
@@ -62,6 +63,22 @@
           <button id="leave-btn">Leave</button>
         </div>
       </div>
+    </div>
+
+    <!-- Pause overlay -->
+    <div id="pause-screen" style="display:none">
+      <div id="pause-box">
+        <div id="pause-label">PAUSED</div>
+        <button id="resume-btn">RESUME</button>
+      </div>
+    </div>
+
+    <!-- Mobile on-screen controls (shown on touch devices) -->
+    <div id="mobile-btns">
+      <button id="mb-left"  class="mb-btn">◀</button>
+      <button id="mb-trail" class="mb-btn" style="font-size:.6rem;letter-spacing:1px">TRAIL</button>
+      <button id="mb-pause" class="mb-btn">⏸</button>
+      <button id="mb-right" class="mb-btn">▶</button>
     </div>
   </div>
 

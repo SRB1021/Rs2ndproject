@@ -175,6 +175,18 @@ class Room {
     this.grid  = null;
   }
 
+  pause() {
+    if (this.state !== 'playing') return;
+    this.state = 'paused';
+    clearInterval(this.interval); this.interval = null;
+  }
+
+  resume() {
+    if (this.state !== 'paused') return;
+    this.state = 'playing';
+    this.interval = setInterval(() => this.tick(), TICK_MS);
+  }
+
   destroy() { if (this.interval) clearInterval(this.interval); }
 }
 
@@ -219,6 +231,22 @@ io.on('connection', socket => {
     if (!room||room.hostId!==socket.id||room.state!=='finished') return;
     room.restart();
     io.to(room.code).emit('lobby-update', room.lobby());
+  });
+
+  socket.on('pause-game', () => {
+    if (!room||room.state!=='playing') return;
+    const p=room.players.get(socket.id);
+    if (!p||p.isBot) return;
+    room.pause();
+    io.to(room.code).emit('game-paused');
+  });
+
+  socket.on('resume-game', () => {
+    if (!room||room.state!=='paused') return;
+    const p=room.players.get(socket.id);
+    if (!p||p.isBot) return;
+    room.resume();
+    io.to(room.code).emit('game-resumed');
   });
 
   socket.on('turn', ({dir}) => { if (room) room.setDir(socket.id,dir); });

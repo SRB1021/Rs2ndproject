@@ -156,6 +156,7 @@ let players   = {};
 let lastTick  = 0;
 let tickMs    = 80;
 let gameActive = false;
+let isPaused  = false;
 let trailOn   = true;
 let camAngleY = 0;
 let viewMode  = 'first'; // 'first' | 'top'
@@ -270,6 +271,20 @@ socket.on('tick', data => {
   lastTick = now;
 });
 
+socket.on('game-paused', () => {
+  isPaused = true;
+  document.getElementById('pause-screen').style.display = 'flex';
+  document.getElementById('pause-btn').textContent = '▶';
+  document.getElementById('mb-pause').textContent  = '▶';
+});
+
+socket.on('game-resumed', () => {
+  isPaused = false;
+  document.getElementById('pause-screen').style.display = 'none';
+  document.getElementById('pause-btn').textContent = '⏸';
+  document.getElementById('mb-pause').textContent  = '⏸';
+});
+
 socket.on('trail-status', ({ active }) => {
   trailOn = active;
   updateTrailBtn();
@@ -338,6 +353,10 @@ function startGame(data) {
     hp.appendChild(chip);
   }
 
+  isPaused = false;
+  document.getElementById('pause-screen').style.display = 'none';
+  document.getElementById('pause-btn').textContent = '⏸';
+  document.getElementById('mb-pause').textContent  = '⏸';
   updateTrailBtn();
   document.getElementById('lobby').style.display          = 'none';
   document.getElementById('waiting-room').style.display   = 'none';
@@ -376,7 +395,9 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  if (!gameActive) return;
+  if (e.key === 'p' || e.key === 'P') { if (gameActive) togglePause(); return; }
+
+  if (!gameActive || isPaused) return;
   const me = players[myId];
   if (!me || !me.alive) return;
 
@@ -598,7 +619,48 @@ document.getElementById('start-btn').addEventListener('click',       () => socke
 document.getElementById('add-bot-btn').addEventListener('click',     () => socket.emit('add-bot'));
 document.getElementById('remove-bot-btn').addEventListener('click',  () => socket.emit('remove-bot'));
 document.getElementById('trail-toggle-btn').addEventListener('click',() => { if (gameActive) socket.emit('toggle-trail'); });
+document.getElementById('pause-btn').addEventListener('click',       () => { if (gameActive) togglePause(); });
+document.getElementById('resume-btn').addEventListener('click',      () => togglePause());
 document.getElementById('mute-btn').addEventListener('click',        () => music.toggleMute());
+
+// ── Mobile buttons ─────────────────────────────────────────────────────────
+document.getElementById('mb-left').addEventListener('click',  () => sendRelativeTurn('left'));
+document.getElementById('mb-right').addEventListener('click', () => sendRelativeTurn('right'));
+document.getElementById('mb-trail').addEventListener('click', () => { if (gameActive && !isPaused) socket.emit('toggle-trail'); });
+document.getElementById('mb-pause').addEventListener('click', () => { if (gameActive) togglePause(); });
+
+function togglePause() {
+  socket.emit(isPaused ? 'resume-game' : 'pause-game');
+}
+
+function sendRelativeTurn(side) {
+  if (!gameActive || isPaused) return;
+  const me = players[myId];
+  if (!me || !me.alive) return;
+  const cur = me.serverDir || me.dir;
+  const dir = side === 'left' ? TURN_LEFT[cur] : TURN_RIGHT[cur];
+  if (!dir || dir === cur) return;
+  me.dir = dir;
+  socket.emit('turn', { dir });
+}
+
+// ── Swipe controls ─────────────────────────────────────────────────────────
+let touchStartX = 0, touchStartY = 0;
+document.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.addEventListener('touchend', e => {
+  if (!gameActive || isPaused) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 30) return; // ignore taps
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    sendRelativeTurn(dx > 0 ? 'right' : 'left');
+  }
+  // vertical swipe: up = go straight (no action needed), down = ignored
+}, { passive: true });
 document.getElementById('play-again-btn').addEventListener('click', () => {
   // Host restarts: server resets room → triggers lobby-update → all clients see waiting room
   socket.emit('restart-game');
@@ -615,7 +677,7 @@ document.getElementById('leave-btn').addEventListener('click', () => {
 // ── Render loop ────────────────────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
-  if (gameActive) updateScene();
+  if (gameActive && !isPaused) updateScene();
   composer.render();
 }
 animate();
