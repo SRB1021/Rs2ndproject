@@ -155,8 +155,10 @@ let isHost    = false;
 let players   = {};
 let lastTick  = 0;
 let tickMs    = 80;
-let gameActive = false;
-let isPaused  = false;
+let gameActive    = false;
+let isPaused      = false;
+let spectating    = false;
+let spectateTarget = null;
 let trailOn   = true;
 let camAngleY = 0;
 let viewMode  = 'first'; // 'first' | 'top'
@@ -171,26 +173,27 @@ function updateScene() {
     const wx = p.prevX + (p.targetX - p.prevX) * t;
     const wz = p.prevZ + (p.targetZ - p.prevZ) * t;
 
-    if (id === myId) {
-      if (viewMode === 'first') {
-        camera.position.set(wx, CAM_H, wz);
-        camera.rotation.x = -0.05; // enforce tilt every frame so bird's eye can't bleed through
-        camera.rotation.z = 0;
-        const target = CAM_ANGLE[p.dir] ?? camAngleY;
-        let diff = target - camAngleY;
-        while (diff >  Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        camAngleY += diff * 0.8;
-        camera.rotation.y = camAngleY;
-      } else {
-        // Bird's eye: fixed height, look straight down, own bike visible
-        camera.position.set(wx, BIRDS_EYE_H, wz);
-        camera.rotation.x = -Math.PI / 2;
-        camera.rotation.y = 0;
-        camera.rotation.z = 0;
-        p.mesh.position.set(wx, 0, wz);
-        p.mesh.rotation.y = BIKE_ROT[p.dir];
-      }
+    // Camera follows own bike normally; follows spectate target when spectating
+    const isCamera = spectating ? (id === spectateTarget) : (id === myId);
+
+    if (isCamera && viewMode === 'first') {
+      camera.position.set(wx, CAM_H, wz);
+      camera.rotation.x = -0.05;
+      camera.rotation.z = 0;
+      const target = CAM_ANGLE[p.dir] ?? camAngleY;
+      let diff = target - camAngleY;
+      while (diff >  Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      camAngleY += diff * 0.8;
+      camera.rotation.y = camAngleY;
+      // Mesh hidden in first-person (camera IS the bike)
+    } else if (isCamera && viewMode === 'top') {
+      camera.position.set(wx, BIRDS_EYE_H, wz);
+      camera.rotation.x = -Math.PI / 2;
+      camera.rotation.y = 0;
+      camera.rotation.z = 0;
+      p.mesh.position.set(wx, 0, wz);
+      p.mesh.rotation.y = BIKE_ROT[p.dir];
     } else {
       p.mesh.position.set(wx, 0, wz);
     }
@@ -263,6 +266,8 @@ socket.on('tick', data => {
     if (!pd.alive) {
       p.mesh.visible = false;
       document.getElementById('chip-' + pd.id)?.classList.add('dead');
+      if (pd.id === myId && !spectating) startSpectating();
+      if (pd.id === spectateTarget)       cycleSpectateTarget();
     } else if (pd.id !== myId) {
       p.mesh.rotation.y = BIKE_ROT[pd.dir];
     }
@@ -292,6 +297,8 @@ socket.on('trail-status', ({ active }) => {
 
 socket.on('game-over', data => {
   gameActive = false;
+  spectating = false; spectateTarget = null;
+  document.getElementById('spectate-hud').style.display = 'none';
   music.stop();
   const msg = document.getElementById('end-msg');
   if (data.winner) {
@@ -314,10 +321,12 @@ function startGame(data) {
   while (scene.children.length) scene.remove(scene.children[0]);
   buildArena(data.gridSize);
 
-  // Reset view state before the loop so mesh.visible and camera are always correct
-  viewMode  = 'first';
+  viewMode       = 'first';
+  spectating     = false;
+  spectateTarget = null;
   players   = {};
   lastTick  = performance.now();
+  document.getElementById('spectate-hud').style.display = 'none';
 
   for (const pd of data.players) {
     const mesh = createBike(pd.color);
@@ -334,7 +343,7 @@ function startGame(data) {
     }
 
     players[pd.id] = {
-      color: pd.color, dir: pd.dir, serverDir: pd.dir,
+      name: pd.name, color: pd.color, dir: pd.dir, serverDir: pd.dir,
       targetX: pd.x, targetZ: pd.y,
       prevX:   pd.x, prevZ:   pd.y,
       mesh, trailMeshes: [], alive: true,
@@ -383,6 +392,7 @@ document.addEventListener('keydown', e => {
   if ((e.key === 'c' || e.key === 'C') && gameActive) { toggleView(); return; }
 
   if (e.key === 'p' || e.key === 'P') { if (gameActive) togglePause(); return; }
+  if (e.key === 'Tab') { e.preventDefault(); if (spectating) cycleSpectateTarget(); return; }
 
   if (!gameActive || isPaused) return;
   const me = players[myId];
@@ -623,11 +633,13 @@ function togglePause() {
 
 function toggleView() {
   viewMode = viewMode === 'first' ? 'top' : 'first';
-  const me = players[myId];
-  if (me && me.mesh) {
-    me.mesh.visible = viewMode === 'top';
+  // The "camera subject" is the spectate target when spectating, own bike otherwise
+  const subjectId = spectating ? spectateTarget : myId;
+  const p = players[subjectId];
+  if (p && p.mesh) {
+    p.mesh.visible = viewMode === 'top';
     if (viewMode === 'first') {
-      camAngleY = CAM_ANGLE[me.dir];
+      camAngleY = CAM_ANGLE[p.dir];
       camera.rotation.y = camAngleY;
       camera.rotation.x = -0.05;
       camera.rotation.z = 0;
@@ -635,6 +647,44 @@ function toggleView() {
   }
   const btn = document.getElementById('mb-view');
   if (btn) btn.textContent = viewMode === 'top' ? '1ST' : 'CAM';
+}
+
+// ── Spectator mode ─────────────────────────────────────────────────────────
+function startSpectating() {
+  const aliveEntry = Object.entries(players).find(([id, p]) => p.alive && id !== myId);
+  if (!aliveEntry) return; // no one left to watch — game-over will fire anyway
+  spectating = true;
+  spectateTarget = aliveEntry[0];
+  if (viewMode === 'first') players[spectateTarget].mesh.visible = false;
+  camAngleY = CAM_ANGLE[players[spectateTarget].dir];
+  updateSpectateHUD();
+}
+
+function cycleSpectateTarget() {
+  // Restore mesh of previous target (if still alive and in first-person mode)
+  if (spectateTarget && players[spectateTarget]?.alive && viewMode === 'first') {
+    players[spectateTarget].mesh.visible = true;
+  }
+  const aliveIds = Object.entries(players)
+    .filter(([id, p]) => p.alive && id !== myId)
+    .map(([id]) => id);
+  if (aliveIds.length === 0) { spectating = false; return; }
+  const idx = aliveIds.indexOf(spectateTarget);
+  spectateTarget = aliveIds[(idx + 1) % aliveIds.length];
+  if (viewMode === 'first') players[spectateTarget].mesh.visible = false;
+  camAngleY = CAM_ANGLE[players[spectateTarget].dir];
+  updateSpectateHUD();
+}
+
+function updateSpectateHUD() {
+  const p = players[spectateTarget];
+  if (!p) return;
+  const hud = document.getElementById('spectate-hud');
+  const nameEl = document.getElementById('spectate-name');
+  hud.style.display = 'flex';
+  nameEl.textContent = 'SPECTATING: ' + p.name;
+  nameEl.style.color = p.color;
+  nameEl.style.textShadow = `0 0 8px ${p.color}`;
 }
 
 function sendRelativeTurn(side) {
@@ -659,11 +709,16 @@ document.addEventListener('touchend', e => {
   if (!gameActive || isPaused) return;
   const dx = e.changedTouches[0].clientX - touchStartX;
   const dy = e.changedTouches[0].clientY - touchStartY;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < 30) return; // ignore taps
-  if (Math.abs(dx) >= Math.abs(dy)) {
+  const dist = Math.max(Math.abs(dx), Math.abs(dy));
+  if (dist < 30) {
+    // Tap: cycle spectate target when dead
+    if (spectating) cycleSpectateTarget();
+    return;
+  }
+  // Swipe: turn (only when alive)
+  if (!spectating && Math.abs(dx) >= Math.abs(dy)) {
     sendRelativeTurn(dx > 0 ? 'right' : 'left');
   }
-  // vertical swipe: up = go straight (no action needed), down = ignored
 }, { passive: true });
 document.getElementById('play-again-btn').addEventListener('click', () => {
   // Host restarts: server resets room → triggers lobby-update → all clients see waiting room
@@ -673,9 +728,8 @@ document.getElementById('leave-btn').addEventListener('click', () => {
   document.getElementById('end-screen').style.display     = 'none';
   document.getElementById('game-container').style.display = 'none';
   document.getElementById('lobby').style.display          = 'flex';
-  gameActive = false;
-  myId = null;
-  isHost = false;
+  gameActive = false; spectating = false; spectateTarget = null;
+  myId = null; isHost = false;
 });
 
 // ── Render loop ────────────────────────────────────────────────────────────
