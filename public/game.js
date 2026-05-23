@@ -357,6 +357,7 @@ function startGame(data) {
   document.getElementById('pause-screen').style.display = 'none';
   document.getElementById('pause-btn').textContent = '⏸';
   document.getElementById('mb-pause').textContent  = '⏸';
+  document.getElementById('mb-view').textContent   = 'CAM';
   updateTrailBtn();
   document.getElementById('lobby').style.display          = 'none';
   document.getElementById('waiting-room').style.display   = 'none';
@@ -379,21 +380,7 @@ document.addEventListener('keydown', e => {
 
   if (e.key === ' ' && gameActive) { e.preventDefault(); socket.emit('toggle-trail'); return; }
 
-  if ((e.key === 'c' || e.key === 'C') && gameActive) {
-    viewMode = viewMode === 'first' ? 'top' : 'first';
-    const me = players[myId];
-    if (me && me.mesh) {
-      me.mesh.visible = viewMode === 'top';
-      if (viewMode === 'first') {
-        // Snap camera rotation back to current direction on return
-        camAngleY = CAM_ANGLE[me.dir];
-        camera.rotation.y = camAngleY;
-        camera.rotation.x = -0.05;
-        camera.rotation.z = 0;
-      }
-    }
-    return;
-  }
+  if ((e.key === 'c' || e.key === 'C') && gameActive) { toggleView(); return; }
 
   if (e.key === 'p' || e.key === 'P') { if (gameActive) togglePause(); return; }
 
@@ -627,10 +614,27 @@ document.getElementById('mute-btn').addEventListener('click',        () => music
 document.getElementById('mb-left').addEventListener('click',  () => sendRelativeTurn('left'));
 document.getElementById('mb-right').addEventListener('click', () => sendRelativeTurn('right'));
 document.getElementById('mb-trail').addEventListener('click', () => { if (gameActive && !isPaused) socket.emit('toggle-trail'); });
+document.getElementById('mb-view').addEventListener('click',  () => { if (gameActive) toggleView(); });
 document.getElementById('mb-pause').addEventListener('click', () => { if (gameActive) togglePause(); });
 
 function togglePause() {
   socket.emit(isPaused ? 'resume-game' : 'pause-game');
+}
+
+function toggleView() {
+  viewMode = viewMode === 'first' ? 'top' : 'first';
+  const me = players[myId];
+  if (me && me.mesh) {
+    me.mesh.visible = viewMode === 'top';
+    if (viewMode === 'first') {
+      camAngleY = CAM_ANGLE[me.dir];
+      camera.rotation.y = camAngleY;
+      camera.rotation.x = -0.05;
+      camera.rotation.z = 0;
+    }
+  }
+  const btn = document.getElementById('mb-view');
+  if (btn) btn.textContent = viewMode === 'top' ? '1ST' : 'CAM';
 }
 
 function sendRelativeTurn(side) {

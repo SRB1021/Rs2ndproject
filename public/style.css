@@ -223,8 +223,8 @@ button:hover { background: rgba(0,229,255,.1); box-shadow: 0 0 12px #00e5ff; }
 }
 .mb-btn {
   pointer-events: auto;
-  width: 72px;
-  height: 72px;
+  width: 62px;
+  height: 62px;
   font-size: 1.5rem;
   border-radius: 6px;
   background: rgba(0, 0, 0, .65);
