@@ -653,8 +653,17 @@ document.getElementById('resume-btn').addEventListener('click',      () => toggl
 document.getElementById('mute-btn').addEventListener('click',        () => music.toggleMute());
 
 // ── Mobile buttons ─────────────────────────────────────────────────────────
-document.getElementById('mb-left').addEventListener('click',  () => sendRelativeTurn('left'));
-document.getElementById('mb-right').addEventListener('click', () => sendRelativeTurn('right'));
+// Turn buttons use touchstart (fires on finger-down, not after release)
+// e.preventDefault() stops the ~300ms-delayed click from also firing
+['mb-left', 'mb-right'].forEach(id => {
+  const side = id === 'mb-left' ? 'left' : 'right';
+  document.getElementById(id).addEventListener('touchstart', e => {
+    e.preventDefault();
+    sendRelativeTurn(side);
+  }, { passive: false });
+  // Fallback for desktop/mouse
+  document.getElementById(id).addEventListener('click', () => sendRelativeTurn(side));
+});
 document.getElementById('mb-trail').addEventListener('click', () => { if (gameActive && !isPaused) socket.emit('toggle-trail'); });
 document.getElementById('mb-view').addEventListener('click',  () => { if (gameActive) toggleView(); });
 document.getElementById('mb-pause').addEventListener('click', () => { if (gameActive) togglePause(); });
