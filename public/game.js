@@ -404,25 +404,19 @@ document.addEventListener('keydown', e => {
   const cur = me.serverDir || me.dir;
   let dir = null;
 
-  if (viewMode === 'top') {
-    // Bird's eye: absolute grid directions — what you press matches what you see on screen
-    if      (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') dir = 'UP';
-    else if (e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S') dir = 'DOWN';
-    else if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') dir = 'LEFT';
-    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = 'RIGHT';
-    if (dir === OPP[cur]) return; // still block 180° reversal
-  } else {
-    // First-person: relative turns — left/right relative to facing direction
-    if      (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') dir = TURN_LEFT[cur];
-    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = TURN_RIGHT[cur];
-    else if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') dir = cur; // go straight
-    // S / ArrowDown: reverse not allowed in TRON — ignore
-  }
+  // A/D = relative turn (left/right from your facing direction) in both views.
+  // W/S = absolute grid UP/DOWN in both views — intuitive in bird's eye,
+  //       and still useful in first-person as "steer toward north/south".
+  // Pressing the exact opposite of current direction is always blocked.
+  if      (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') dir = TURN_LEFT[cur];
+  else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = TURN_RIGHT[cur];
+  else if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') dir = 'UP';
+  else if (e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S') dir = 'DOWN';
 
-  if (!dir || dir === cur) return; // no turn needed
+  if (!dir || dir === cur || dir === OPP[cur]) return; // no turn or reversal
   e.preventDefault();
 
-  me.dir = dir; // local prediction so camera responds immediately
+  me.dir = dir;
   socket.emit('turn', { dir });
 });
 
