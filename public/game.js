@@ -404,10 +404,20 @@ document.addEventListener('keydown', e => {
   const cur = me.serverDir || me.dir;
   let dir = null;
 
-  if      (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') dir = TURN_LEFT[cur];
-  else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = TURN_RIGHT[cur];
-  else if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') dir = cur; // go straight
-  // S / ArrowDown: reverse not allowed in TRON — ignore
+  if (viewMode === 'top') {
+    // Bird's eye: absolute grid directions — what you press matches what you see on screen
+    if      (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') dir = 'UP';
+    else if (e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S') dir = 'DOWN';
+    else if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') dir = 'LEFT';
+    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = 'RIGHT';
+    if (dir === OPP[cur]) return; // still block 180° reversal
+  } else {
+    // First-person: relative turns — left/right relative to facing direction
+    if      (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') dir = TURN_LEFT[cur];
+    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dir = TURN_RIGHT[cur];
+    else if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') dir = cur; // go straight
+    // S / ArrowDown: reverse not allowed in TRON — ignore
+  }
 
   if (!dir || dir === cur) return; // no turn needed
   e.preventDefault();
