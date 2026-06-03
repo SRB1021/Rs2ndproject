@@ -37,7 +37,8 @@ const STARTS = [
 ];
 
 // ── Bot flood-fill AI ──────────────────────────────────────────────────────
-function floodCount(x, y, dir, grid, max=300) {
+// Lookahead capped at 60 cells (was 300) — bots miss long-range traps.
+function floodCount(x, y, dir, grid, max=60) {
   const [dx,dy] = MOVE[dir];
   const nx=x+dx, ny=y+dy;
   if (nx<0||nx>=GRID||ny<0||ny>=GRID||grid[ny][nx]!==null) return 0;
@@ -56,11 +57,22 @@ function floodCount(x, y, dir, grid, max=300) {
   return count;
 }
 
+// 30% chance to wander randomly instead of taking the optimal move.
+const BOT_MISTAKE_CHANCE = 0.30;
+
 function botDecide(bot, grid) {
+  const validDirs = Object.keys(MOVE).filter(dir => dir !== OPP[bot.dir]);
+
+  // Random mistake: pick any safe (non-fatal) direction
+  if (Math.random() < BOT_MISTAKE_CHANCE) {
+    const safe = validDirs.filter(dir => floodCount(bot.x, bot.y, dir, grid) > 0);
+    if (safe.length) { bot.nextDir = safe[Math.random() * safe.length | 0]; return; }
+  }
+
+  // Otherwise pick the direction with most open space (straight-ahead bias reduced)
   let best=bot.dir, score=-1;
-  for (const dir of Object.keys(MOVE)) {
-    if (dir===OPP[bot.dir]) continue;
-    const s = floodCount(bot.x, bot.y, dir, grid) + (dir===bot.dir ? 10 : 0);
+  for (const dir of validDirs) {
+    const s = floodCount(bot.x, bot.y, dir, grid) + (dir===bot.dir ? 3 : 0);
     if (s>score) { score=s; best=dir; }
   }
   bot.nextDir = best;
