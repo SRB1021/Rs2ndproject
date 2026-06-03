@@ -36,44 +36,60 @@ const STARTS = [
   { x:GRID/2,  y:GRID-9, dir:'UP'    },
 ];
 
-// ── Bot flood-fill AI ──────────────────────────────────────────────────────
-// Lookahead capped at 60 cells (was 300) — bots miss long-range traps.
-function floodCount(x, y, dir, grid, max=60) {
-  const [dx,dy] = MOVE[dir];
-  const nx=x+dx, ny=y+dy;
-  if (nx<0||nx>=GRID||ny<0||ny>=GRID||grid[ny][nx]!==null) return 0;
-  const vis = new Uint8Array(GRID*GRID);
-  const q = [ny*GRID+nx]; vis[ny*GRID+nx]=1;
-  let head=0, count=0;
-  while (head<q.length && count<max) {
-    const pos=q[head++]; const cy=(pos/GRID)|0, cx=pos%GRID; count++;
-    for (const [ddx,ddy] of MOVE_VALS) {
-      const qx=cx+ddx, qy=cy+ddy;
-      if (qx>=0&&qx<GRID&&qy>=0&&qy<GRID&&!vis[qy*GRID+qx]&&grid[qy][qx]===null) {
-        vis[qy*GRID+qx]=1; q.push(qy*GRID+qx);
-      }
+// ── Bot AI — Voronoi territory heuristic ───────────────────────────────────
+// For each candidate move, run a multi-source BFS seeded by the bot's new
+// cell AND every other alive player's current cell. Each empty cell is
+// "claimed" by whichever source reaches it first (ties go to first-come in
+// queue order). The bot picks the move that maximises its own territory.
+// This naturally produces cut-off, chase, and escape-route behaviour — the
+// same intuitions a human player develops.
+function voronoiScore(bot, dir, grid, all) {
+  const [dx, dy] = MOVE[dir];
+  const nx = bot.x + dx, ny = bot.y + dy;
+  if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || grid[ny][nx] !== null) return -1;
+
+  const owner = new Int32Array(GRID * GRID).fill(-1);
+  const q = [];
+
+  // Seed this bot's candidate next cell as owner 0
+  owner[ny * GRID + nx] = 0;
+  q.push(ny * GRID + nx);
+
+  // Seed each other alive player at their current position
+  let oid = 1;
+  for (const p of all) {
+    if (p.id === bot.id || !p.alive) continue;
+    const idx = p.y * GRID + p.x;
+    if (owner[idx] === -1 && grid[p.y][p.x] === null) {
+      owner[idx] = oid++;
+      q.push(idx);
     }
   }
-  return count;
-}
 
-// 30% chance to wander randomly instead of taking the optimal move.
-const BOT_MISTAKE_CHANCE = 0.30;
-
-function botDecide(bot, grid) {
-  const validDirs = Object.keys(MOVE).filter(dir => dir !== OPP[bot.dir]);
-
-  // Random mistake: pick any safe (non-fatal) direction
-  if (Math.random() < BOT_MISTAKE_CHANCE) {
-    const safe = validDirs.filter(dir => floodCount(bot.x, bot.y, dir, grid) > 0);
-    if (safe.length) { bot.nextDir = safe[Math.random() * safe.length | 0]; return; }
+  let head = 0, mine = 0;
+  while (head < q.length) {
+    const idx = q[head++];
+    const cy = (idx / GRID) | 0, cx = idx % GRID;
+    for (const [ddx, ddy] of MOVE_VALS) {
+      const qx = cx + ddx, qy = cy + ddy;
+      if (qx < 0 || qx >= GRID || qy < 0 || qy >= GRID) continue;
+      const qi = qy * GRID + qx;
+      if (owner[qi] !== -1 || grid[qy][qx] !== null) continue;
+      owner[qi] = owner[idx];
+      q.push(qi);
+    }
   }
 
-  // Otherwise pick the direction with most open space (straight-ahead bias reduced)
-  let best=bot.dir, score=-1;
-  for (const dir of validDirs) {
-    const s = floodCount(bot.x, bot.y, dir, grid) + (dir===bot.dir ? 3 : 0);
-    if (s>score) { score=s; best=dir; }
+  for (let i = 0; i < GRID * GRID; i++) if (owner[i] === 0) mine++;
+  return mine;
+}
+
+function botDecide(bot, grid, all) {
+  let best = bot.dir, score = -1;
+  for (const dir of Object.keys(MOVE)) {
+    if (dir === OPP[bot.dir]) continue;
+    const s = voronoiScore(bot, dir, grid, all);
+    if (s > score) { score = s; best = dir; }
   }
   bot.nextDir = best;
 }
@@ -141,7 +157,7 @@ class Room {
 
   tick() {
     const all=[...this.players.values()];
-    for (const p of all) if (p.isBot && p.alive) botDecide(p, this.grid);
+    for (const p of all) if (p.isBot && p.alive) botDecide(p, this.grid, all);
 
     for (const p of all) {
       if (!p.alive) continue;
