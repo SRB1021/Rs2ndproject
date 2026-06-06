@@ -142,8 +142,10 @@ class Room {
     this.state='playing';
     this.grid=Array.from({length:GRID}, ()=>new Array(GRID).fill(null));
     const all=[...this.players.values()];
+    // Shuffle spawn slots so no player (bot or human) always gets the same start
+    const slots = [...STARTS].sort(() => Math.random() - 0.5);
     all.forEach((p,i)=>{
-      const s=STARTS[i];
+      const s=slots[i];
       p.x=s.x; p.y=s.y; p.dir=s.dir; p.nextDir=s.dir;
       p.alive=true; p.trail=[{x:s.x,y:s.y}]; p.trailActive=true;
       this.grid[s.y][s.x]=p.id;
