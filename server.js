@@ -93,6 +93,7 @@ function voronoiScores(bot, dir, grid, all) {
 }
 
 function botDecide(bot, grid, all) {
+  const opponents = all.filter(p => p.alive && p.id !== bot.id);
   let best = bot.dir, bestScore = -Infinity;
 
   for (const dir of Object.keys(MOVE)) {
@@ -100,8 +101,25 @@ function botDecide(bot, grid, all) {
     const result = voronoiScores(bot, dir, grid, all);
     if (!result) continue; // fatal move — skip
 
-    // Aggressive: gain space AND deny opponents space with equal weight
-    const score = result.mine - result.opponentTotal;
+    const [dx, dy] = MOVE[dir];
+    const nx = bot.x + dx, ny = bot.y + dy;
+
+    // Territory advantage (mine − opponent space)
+    let score = result.mine - result.opponentTotal;
+
+    // Chase bonus: strongly reward moves that close the gap to the nearest opponent.
+    // On an open grid the Voronoi diff is tiny (~0–10), so without this the bot
+    // just goes straight. The bonus (up to GRID*2 * 8 ≈ 1024) overrides that
+    // indifference and steers the bot toward its target.
+    if (opponents.length > 0) {
+      let minDist = Infinity;
+      for (const opp of opponents) {
+        const d = Math.abs(nx - opp.x) + Math.abs(ny - opp.y);
+        if (d < minDist) minDist = d;
+      }
+      score += (GRID * 2 - minDist) * 8;
+    }
+
     if (score > bestScore) { bestScore = score; best = dir; }
   }
 
