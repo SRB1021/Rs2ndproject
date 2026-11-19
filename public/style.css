@@ -142,6 +142,22 @@ button:hover { background: rgba(0,229,255,.1); box-shadow: 0 0 12px #00e5ff; }
   font-size: .9rem;
 }
 
+/* ── Grid size picker ── */
+#grid-size-btns { display: flex; gap: 8px; }
+.grid-size-btn {
+  flex: 1;
+  font-size: .75rem;
+  padding: 8px 10px;
+  border-color: #334;
+  color: #778;
+}
+.grid-size-btn:hover { border-color: #00e5ff; color: #00e5ff; }
+.grid-size-btn.active {
+  border-color: #00e5ff;
+  color: #00e5ff;
+  box-shadow: 0 0 10px #00e5ff44;
+}
+
 #bot-controls { display: flex; gap: 8px; }
 #bot-controls button {
   font-size: .75rem;

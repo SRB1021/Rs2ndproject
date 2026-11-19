@@ -212,6 +212,7 @@ socket.on('room-joined',   d   => { isHost = false; showWaiting(d, false); });
 socket.on('room-error',    msg => { document.getElementById('lobby-error').textContent = msg; });
 socket.on('lobby-update',  d   => {
   refreshPlayerList(d.players);
+  updateGridSizeUI(d.gridSize || 64, isHost);
   // When host restarts, bring everyone back to the waiting room
   if (d.state === 'lobby' && !gameActive &&
       document.getElementById('game-container').style.display !== 'none') {
@@ -432,14 +433,27 @@ function updateTrailBtn() {
 }
 
 // ── UI helpers ─────────────────────────────────────────────────────────────
-function showWaiting(data, isHost) {
+function showWaiting(data, host) {
   document.getElementById('lobby').style.display        = 'none';
   document.getElementById('waiting-room').style.display = 'flex';
   document.getElementById('room-code-display').textContent = data.code;
-  document.getElementById('start-btn').style.display    = isHost ? 'block' : 'none';
-  document.getElementById('waiting-msg').style.display  = isHost ? 'none'  : 'block';
-  document.getElementById('bot-controls').style.display = isHost ? 'flex'  : 'none';
+  document.getElementById('start-btn').style.display    = host ? 'block' : 'none';
+  document.getElementById('waiting-msg').style.display  = host ? 'none'  : 'block';
+  document.getElementById('bot-controls').style.display = host ? 'flex'  : 'none';
+  document.getElementById('grid-size-picker').style.display = host ? 'block' : 'none';
+  document.getElementById('grid-size-display').style.display = host ? 'none' : 'block';
+  updateGridSizeUI(data.gridSize || 64, host);
   refreshPlayerList(data.players);
+}
+
+function updateGridSizeUI(size, host) {
+  // Update active button for host
+  document.querySelectorAll('.grid-size-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.size) === size);
+  });
+  // Update label for guests
+  const label = size === 64 ? 'Small' : size === 96 ? 'Medium' : 'Large';
+  document.getElementById('grid-size-display').textContent = `Grid: ${label}`;
 }
 
 function refreshPlayerList(list) {
@@ -497,6 +511,11 @@ document.getElementById('code-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('join-btn').click();
 });
 document.getElementById('start-btn').addEventListener('click',       () => socket.emit('start-game'));
+document.querySelectorAll('.grid-size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    socket.emit('set-grid-size', { size: Number(btn.dataset.size) });
+  });
+});
 document.getElementById('add-bot-btn').addEventListener('click',     () => socket.emit('add-bot'));
 document.getElementById('remove-bot-btn').addEventListener('click',  () => socket.emit('remove-bot'));
 document.getElementById('trail-toggle-btn').addEventListener('click',() => { if (gameActive) socket.emit('toggle-trail'); });

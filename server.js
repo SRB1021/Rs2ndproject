@@ -9,7 +9,7 @@ const io = new Server(httpServer);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const GRID    = 64;
+const GRID_SIZES = { small: 64, medium: 96, large: 128 };
 const TICK_MS = 80;  // ~12 ticks/s — smoother than 100ms
 const MAX_PL  = 4;
 const COLORS  = ['#00e5ff', '#ff1744', '#ffea00', '#00e676'];
@@ -29,12 +29,16 @@ function genCode() {
   return code;
 }
 
-const STARTS = [
-  { x:8,       y:GRID/2, dir:'RIGHT' },
-  { x:GRID-9,  y:GRID/2, dir:'LEFT'  },
-  { x:GRID/2,  y:8,      dir:'DOWN'  },
-  { x:GRID/2,  y:GRID-9, dir:'UP'    },
-];
+function makeStarts(G) {
+  const m = Math.max(8, Math.round(G * 0.125));
+  const h = Math.round(G / 2);
+  return [
+    { x: m,       y: h,       dir: 'RIGHT' },
+    { x: G-m-1,   y: h,       dir: 'LEFT'  },
+    { x: h,       y: m,       dir: 'DOWN'  },
+    { x: h,       y: G-m-1,   dir: 'UP'    },
+  ];
+}
 
 // ── Bot AI — aggressive Voronoi heuristic ──────────────────────────────────
 // For each candidate move, partition the remaining grid between this bot
@@ -43,25 +47,23 @@ const STARTS = [
 // This single formula handles survival, territory, cut-off, AND chasing:
 // denying an opponent a cell scores exactly as well as claiming it yourself,
 // so the bot actively hunts rather than just filling its own side.
-function voronoiScores(bot, dir, grid, all) {
+function voronoiScores(bot, dir, grid, all, G) {
   const [dx, dy] = MOVE[dir];
   const nx = bot.x + dx, ny = bot.y + dy;
-  if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || grid[ny][nx] !== null)
+  if (nx < 0 || nx >= G || ny < 0 || ny >= G || grid[ny][nx] !== null)
     return null;
 
-  const owner = new Int32Array(GRID * GRID).fill(-1);
+  const owner = new Int32Array(G * G).fill(-1);
   const q = [];
 
-  // Seed: bot's candidate next cell = owner 0
-  owner[ny * GRID + nx] = 0;
-  q.push(ny * GRID + nx);
+  owner[ny * G + nx] = 0;
+  q.push(ny * G + nx);
 
-  // Seed: each other alive player at their current position
   let oid = 1;
   const opponentIds = [];
   for (const p of all) {
     if (p.id === bot.id || !p.alive) continue;
-    const idx = p.y * GRID + p.x;
+    const idx = p.y * G + p.x;
     if (owner[idx] === -1 && grid[p.y][p.x] === null) {
       owner[idx] = oid;
       opponentIds.push(oid++);
@@ -72,11 +74,11 @@ function voronoiScores(bot, dir, grid, all) {
   let head = 0;
   while (head < q.length) {
     const idx = q[head++];
-    const cy = (idx / GRID) | 0, cx = idx % GRID;
+    const cy = (idx / G) | 0, cx = idx % G;
     for (const [ddx, ddy] of MOVE_VALS) {
       const qx = cx + ddx, qy = cy + ddy;
-      if (qx < 0 || qx >= GRID || qy < 0 || qy >= GRID) continue;
-      const qi = qy * GRID + qx;
+      if (qx < 0 || qx >= G || qy < 0 || qy >= G) continue;
+      const qi = qy * G + qx;
       if (owner[qi] !== -1 || grid[qy][qx] !== null) continue;
       owner[qi] = owner[idx];
       q.push(qi);
@@ -84,7 +86,7 @@ function voronoiScores(bot, dir, grid, all) {
   }
 
   const counts = new Int32Array(oid);
-  for (let i = 0; i < GRID * GRID; i++) if (owner[i] >= 0) counts[owner[i]]++;
+  for (let i = 0; i < G * G; i++) if (owner[i] >= 0) counts[owner[i]]++;
 
   let opponentTotal = 0;
   for (const o of opponentIds) opponentTotal += counts[o];
@@ -92,32 +94,27 @@ function voronoiScores(bot, dir, grid, all) {
   return { mine: counts[0], opponentTotal };
 }
 
-function botDecide(bot, grid, all) {
+function botDecide(bot, grid, all, G) {
   const opponents = all.filter(p => p.alive && p.id !== bot.id);
   let best = bot.dir, bestScore = -Infinity;
 
   for (const dir of Object.keys(MOVE)) {
     if (dir === OPP[bot.dir]) continue;
-    const result = voronoiScores(bot, dir, grid, all);
-    if (!result) continue; // fatal move — skip
+    const result = voronoiScores(bot, dir, grid, all, G);
+    if (!result) continue;
 
     const [dx, dy] = MOVE[dir];
     const nx = bot.x + dx, ny = bot.y + dy;
 
-    // Territory advantage (mine − opponent space)
     let score = result.mine - result.opponentTotal;
 
-    // Chase bonus: strongly reward moves that close the gap to the nearest opponent.
-    // On an open grid the Voronoi diff is tiny (~0–10), so without this the bot
-    // just goes straight. The bonus (up to GRID*2 * 8 ≈ 1024) overrides that
-    // indifference and steers the bot toward its target.
     if (opponents.length > 0) {
       let minDist = Infinity;
       for (const opp of opponents) {
         const d = Math.abs(nx - opp.x) + Math.abs(ny - opp.y);
         if (d < minDist) minDist = d;
       }
-      score += (GRID * 2 - minDist) * 8;
+      score += (G * 2 - minDist) * 8;
     }
 
     if (score > bestScore) { bestScore = score; best = dir; }
@@ -131,7 +128,7 @@ class Room {
   constructor(code) {
     this.code=code; this.players=new Map(); this.hostId=null;
     this.state='lobby'; this.grid=null; this.interval=null;
-    this.botCount=0;
+    this.botCount=0; this.gridSize=64;
   }
 
   _mkPlayer(id, name, isBot) {
@@ -171,11 +168,11 @@ class Room {
   }
 
   startGame() {
+    const G = this.gridSize;
     this.state='playing';
-    this.grid=Array.from({length:GRID}, ()=>new Array(GRID).fill(null));
+    this.grid=Array.from({length:G}, ()=>new Array(G).fill(null));
     const all=[...this.players.values()];
-    // Shuffle spawn slots so no player (bot or human) always gets the same start
-    const slots = [...STARTS].sort(() => Math.random() - 0.5);
+    const slots = makeStarts(G).sort(() => Math.random() - 0.5);
     all.forEach((p,i)=>{
       const s=slots[i];
       p.x=s.x; p.y=s.y; p.dir=s.dir; p.nextDir=s.dir;
@@ -184,21 +181,22 @@ class Room {
     });
     const players=all.map(q=>({id:q.id,name:q.name,color:q.color,x:q.x,y:q.y,dir:q.dir,isBot:q.isBot}));
     for (const [sid,p] of this.players) {
-      if (!p.isBot) io.to(sid).emit('game-start',{myId:sid,gridSize:GRID,tickMs:TICK_MS,players});
+      if (!p.isBot) io.to(sid).emit('game-start',{myId:sid,gridSize:G,tickMs:TICK_MS,players});
     }
     this.interval=setInterval(()=>this.tick(), TICK_MS);
   }
 
   tick() {
+    const G = this.gridSize;
     const all=[...this.players.values()];
-    for (const p of all) if (p.isBot && p.alive) botDecide(p, this.grid, all);
+    for (const p of all) if (p.isBot && p.alive) botDecide(p, this.grid, all, G);
 
     for (const p of all) {
       if (!p.alive) continue;
       p.dir=p.nextDir;
       const [dx,dy]=MOVE[p.dir];
       const nx=p.x+dx, ny=p.y+dy;
-      if (nx<0||nx>=GRID||ny<0||ny>=GRID||this.grid[ny][nx]!==null) { p.alive=false; continue; }
+      if (nx<0||nx>=G||ny<0||ny>=G||this.grid[ny][nx]!==null) { p.alive=false; continue; }
       p.x=nx; p.y=ny;
       p.trail.push({x:nx,y:ny});
       if (p.trailActive) this.grid[ny][nx]=p.id;  // only mark if trail is on
@@ -229,7 +227,7 @@ class Room {
   }
 
   lobby() {
-    return { code:this.code, state:this.state,
+    return { code:this.code, state:this.state, gridSize:this.gridSize,
              players:[...this.players.values()].map(p=>({id:p.id,name:p.name,color:p.color,isBot:p.isBot})) };
   }
 
@@ -284,6 +282,13 @@ io.on('connection', socket => {
   socket.on('remove-bot', () => {
     if (!room||room.hostId!==socket.id||room.state!=='lobby') return;
     room.removeLastBot(); io.to(room.code).emit('lobby-update',room.lobby());
+  });
+
+  socket.on('set-grid-size', ({size}) => {
+    if (!room || room.hostId !== socket.id || room.state !== 'lobby') return;
+    if (!Object.values(GRID_SIZES).includes(size)) return;
+    room.gridSize = size;
+    io.to(room.code).emit('lobby-update', room.lobby());
   });
 
   socket.on('start-game', () => {
