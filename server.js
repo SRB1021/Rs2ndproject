@@ -36,37 +36,40 @@ const STARTS = [
   { x:GRID/2,  y:GRID-9, dir:'UP'    },
 ];
 
-// ── Bot AI — Voronoi territory heuristic ───────────────────────────────────
-// For each candidate move, run a multi-source BFS seeded by the bot's new
-// cell AND every other alive player's current cell. Each empty cell is
-// "claimed" by whichever source reaches it first (ties go to first-come in
-// queue order). The bot picks the move that maximises its own territory.
-// This naturally produces cut-off, chase, and escape-route behaviour — the
-// same intuitions a human player develops.
-function voronoiScore(bot, dir, grid, all) {
+// ── Bot AI — aggressive Voronoi heuristic ──────────────────────────────────
+// For each candidate move, partition the remaining grid between this bot
+// and all alive opponents via multi-source BFS (Voronoi).
+// Score = (bot's cells) − (sum of all opponents' cells).
+// This single formula handles survival, territory, cut-off, AND chasing:
+// denying an opponent a cell scores exactly as well as claiming it yourself,
+// so the bot actively hunts rather than just filling its own side.
+function voronoiScores(bot, dir, grid, all) {
   const [dx, dy] = MOVE[dir];
   const nx = bot.x + dx, ny = bot.y + dy;
-  if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || grid[ny][nx] !== null) return -1;
+  if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || grid[ny][nx] !== null)
+    return null;
 
   const owner = new Int32Array(GRID * GRID).fill(-1);
   const q = [];
 
-  // Seed this bot's candidate next cell as owner 0
+  // Seed: bot's candidate next cell = owner 0
   owner[ny * GRID + nx] = 0;
   q.push(ny * GRID + nx);
 
-  // Seed each other alive player at their current position
+  // Seed: each other alive player at their current position
   let oid = 1;
+  const opponentIds = [];
   for (const p of all) {
     if (p.id === bot.id || !p.alive) continue;
     const idx = p.y * GRID + p.x;
     if (owner[idx] === -1 && grid[p.y][p.x] === null) {
-      owner[idx] = oid++;
+      owner[idx] = oid;
+      opponentIds.push(oid++);
       q.push(idx);
     }
   }
 
-  let head = 0, mine = 0;
+  let head = 0;
   while (head < q.length) {
     const idx = q[head++];
     const cy = (idx / GRID) | 0, cx = idx % GRID;
@@ -80,17 +83,28 @@ function voronoiScore(bot, dir, grid, all) {
     }
   }
 
-  for (let i = 0; i < GRID * GRID; i++) if (owner[i] === 0) mine++;
-  return mine;
+  const counts = new Int32Array(oid);
+  for (let i = 0; i < GRID * GRID; i++) if (owner[i] >= 0) counts[owner[i]]++;
+
+  let opponentTotal = 0;
+  for (const o of opponentIds) opponentTotal += counts[o];
+
+  return { mine: counts[0], opponentTotal };
 }
 
 function botDecide(bot, grid, all) {
-  let best = bot.dir, score = -1;
+  let best = bot.dir, bestScore = -Infinity;
+
   for (const dir of Object.keys(MOVE)) {
     if (dir === OPP[bot.dir]) continue;
-    const s = voronoiScore(bot, dir, grid, all);
-    if (s > score) { score = s; best = dir; }
+    const result = voronoiScores(bot, dir, grid, all);
+    if (!result) continue; // fatal move — skip
+
+    // Aggressive: gain space AND deny opponents space with equal weight
+    const score = result.mine - result.opponentTotal;
+    if (score > bestScore) { bestScore = score; best = dir; }
   }
+
   bot.nextDir = best;
 }
 
