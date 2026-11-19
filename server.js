@@ -96,6 +96,18 @@ function voronoiScores(bot, dir, grid, all, G) {
 
 function botDecide(bot, grid, all, G) {
   const opponents = all.filter(p => p.alive && p.id !== bot.id);
+
+  // 15% chance: pick any valid direction — breaks predictable patterns
+  if (Math.random() < 0.15) {
+    const valid = Object.keys(MOVE).filter(d => {
+      if (d === OPP[bot.dir]) return false;
+      const [dx, dy] = MOVE[d];
+      const nx = bot.x + dx, ny = bot.y + dy;
+      return nx >= 0 && nx < G && ny >= 0 && ny < G && grid[ny][nx] === null;
+    });
+    if (valid.length > 0) { bot.nextDir = valid[Math.floor(Math.random() * valid.length)]; return; }
+  }
+
   let best = bot.dir, bestScore = -Infinity;
 
   for (const dir of Object.keys(MOVE)) {
@@ -134,7 +146,9 @@ class Room {
   _mkPlayer(id, name, isBot) {
     const used = new Set([...this.players.values()].map(p => p.color));
     const color = COLORS.find(c => !used.has(c)) || COLORS[0];
-    return { id, name, color,
+    const STYLES = ['blade', 'tank', 'speeder'];
+    const bikeStyle = isBot ? STYLES[Math.floor(Math.random() * 3)] : 'blade';
+    return { id, name, color, bikeStyle,
              x:0, y:0, dir:'RIGHT', nextDir:'RIGHT',
              alive:true, trail:[], trailActive:true, isBot };
   }
@@ -179,7 +193,7 @@ class Room {
       p.alive=true; p.trail=[{x:s.x,y:s.y}]; p.trailActive=true;
       this.grid[s.y][s.x]=p.id;
     });
-    const players=all.map(q=>({id:q.id,name:q.name,color:q.color,x:q.x,y:q.y,dir:q.dir,isBot:q.isBot}));
+    const players=all.map(q=>({id:q.id,name:q.name,color:q.color,bikeStyle:q.bikeStyle,x:q.x,y:q.y,dir:q.dir,isBot:q.isBot}));
     for (const [sid,p] of this.players) {
       if (!p.isBot) io.to(sid).emit('game-start',{myId:sid,gridSize:G,tickMs:TICK_MS,players});
     }
@@ -228,7 +242,7 @@ class Room {
 
   lobby() {
     return { code:this.code, state:this.state, gridSize:this.gridSize,
-             players:[...this.players.values()].map(p=>({id:p.id,name:p.name,color:p.color,isBot:p.isBot})) };
+             players:[...this.players.values()].map(p=>({id:p.id,name:p.name,color:p.color,bikeStyle:p.bikeStyle,isBot:p.isBot})) };
   }
 
   restart() {
@@ -311,11 +325,30 @@ io.on('connection', socket => {
   });
 
   socket.on('resume-game', () => {
-    if (!room||room.state!=='paused') return;
-    const p=room.players.get(socket.id);
-    if (!p||p.isBot) return;
-    room.resume();
-    io.to(room.code).emit('game-resumed');
+    if (!room || room.state !== 'paused') return;
+    const p = room.players.get(socket.id);
+    if (!p || p.isBot) return;
+    let count = 3;
+    io.to(room.code).emit('countdown', { count });
+    const cd = setInterval(() => {
+      count--;
+      if (count > 0) {
+        io.to(room.code).emit('countdown', { count });
+      } else {
+        clearInterval(cd);
+        room.resume();
+        io.to(room.code).emit('game-resumed');
+      }
+    }, 1000);
+  });
+
+  socket.on('set-bike-style', ({ style }) => {
+    if (!room || room.state !== 'lobby') return;
+    if (!['blade', 'tank', 'speeder'].includes(style)) return;
+    const p = room.players.get(socket.id);
+    if (!p || p.isBot) return;
+    p.bikeStyle = style;
+    io.to(room.code).emit('lobby-update', room.lobby());
   });
 
   socket.on('turn', ({dir}) => { if (room) room.setDir(socket.id,dir); });

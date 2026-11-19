@@ -42,6 +42,14 @@
       </div>
     </div>
     <p id="grid-size-display" class="dim" style="display:none;font-size:.75rem"></p>
+    <div id="bike-style-picker">
+      <p class="dim" style="font-size:.7rem;margin-bottom:4px;text-align:center">Bike Style</p>
+      <div id="bike-style-btns">
+        <button class="bike-style-btn active" data-style="blade">BLADE</button>
+        <button class="bike-style-btn" data-style="tank">TANK</button>
+        <button class="bike-style-btn" data-style="speeder">SPEEDER</button>
+      </div>
+    </div>
     <div id="bot-controls" style="display:none">
       <button id="add-bot-btn">+ Add CPU</button>
       <button id="remove-bot-btn">− Remove CPU</button>
@@ -82,6 +90,11 @@
           <button id="leave-btn">Leave</button>
         </div>
       </div>
+    </div>
+
+    <!-- Countdown overlay (3-2-1 on unpause) -->
+    <div id="countdown-overlay" style="display:none">
+      <div id="countdown-num"></div>
     </div>
 
     <!-- Pause overlay -->

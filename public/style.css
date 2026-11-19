@@ -158,6 +158,44 @@ button:hover { background: rgba(0,229,255,.1); box-shadow: 0 0 12px #00e5ff; }
   box-shadow: 0 0 10px #00e5ff44;
 }
 
+/* ── Bike style picker ── */
+#bike-style-btns { display: flex; gap: 8px; }
+.bike-style-btn {
+  flex: 1;
+  font-size: .75rem;
+  padding: 8px 10px;
+  border-color: #334;
+  color: #778;
+}
+.bike-style-btn:hover { border-color: #00e5ff; color: #00e5ff; }
+.bike-style-btn.active {
+  border-color: #00e5ff;
+  color: #00e5ff;
+  box-shadow: 0 0 10px #00e5ff44;
+}
+
+/* ── Countdown overlay ── */
+#countdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(1,1,8,.5);
+  z-index: 25;
+}
+#countdown-num {
+  font-size: 8rem;
+  letter-spacing: 8px;
+  color: #00e5ff;
+  text-shadow: 0 0 40px #00e5ff, 0 0 80px #00e5ff;
+  animation: pulse 0.9s ease-out;
+}
+@keyframes pulse {
+  0%   { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(0.8); opacity: .6; }
+}
+
 #bot-controls { display: flex; gap: 8px; }
 #bot-controls button {
   font-size: .75rem;

@@ -50,8 +50,14 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-// ── TRON Legacy bike model ─────────────────────────────────────────────────
-function createBike(hexColor) {
+// ── Bike models — three styles ─────────────────────────────────────────────
+function createBike(hexColor, style = 'blade') {
+  if (style === 'tank')    return createTankBike(hexColor);
+  if (style === 'speeder') return createSpeederBike(hexColor);
+  return createBladeBike(hexColor);
+}
+
+function createBladeBike(hexColor) {
   const group = new THREE.Group();
   const col   = new THREE.Color(hexColor);
   const dark  = () => new THREE.MeshBasicMaterial({ color: 0x060612 });
@@ -60,17 +66,12 @@ function createBike(hexColor) {
 
   function part(w, h, d, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(x, y, z);
-    m.rotation.set(rx, ry, rz);
-    group.add(m);
+    m.position.set(x, y, z); m.rotation.set(rx, ry, rz); group.add(m);
   }
 
-  // Body panels
   part(0.56, 0.13, 1.80, dark(),  0, 0.13,  0);
   part(0.36, 0.17, 1.32, dark(),  0, 0.32,  0.04);
   part(0.28, 0.13, 0.58, glass(), 0, 0.46, -0.10);
-
-  // Glow trim
   part(0.58, 0.022, 1.82, glow(),  0,     0.022, 0);
   part(0.38, 0.022, 1.34, glow(),  0,     0.412, 0.04);
   part(0.022, 0.15, 1.82, glow(), -0.29,  0.13,  0);
@@ -78,22 +79,87 @@ function createBike(hexColor) {
   part(0.58, 0.15, 0.022, glow(),  0,     0.13, -0.91);
   part(0.58, 0.15, 0.022, glow(),  0,     0.13,  0.91);
 
-  // Wheel disc
   const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.07, 28), dark());
-  wheel.rotation.z = Math.PI / 2;
-  wheel.position.set(0, 0.23, 0.1);
-  group.add(wheel);
-
-  // Wheel rim glow
+  wheel.rotation.z = Math.PI / 2; wheel.position.set(0, 0.23, 0.1); group.add(wheel);
   const rim = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.018, 8, 28), glow());
-  rim.rotation.y = Math.PI / 2;
-  rim.position.set(0, 0.23, 0.1);
-  group.add(rim);
+  rim.rotation.y = Math.PI / 2; rim.position.set(0, 0.23, 0.1); group.add(rim);
+  for (let i = 0; i < 4; i++) part(0.014, 0.46, 0.014, glow(), 0, 0.23, 0.1, (i / 4) * Math.PI, 0, 0);
 
-  // Spokes
-  for (let i = 0; i < 4; i++) {
-    part(0.014, 0.46, 0.014, glow(), 0, 0.23, 0.1, (i / 4) * Math.PI, 0, 0);
+  return group;
+}
+
+function createTankBike(hexColor) {
+  const group = new THREE.Group();
+  const col  = new THREE.Color(hexColor);
+  const dark = () => new THREE.MeshBasicMaterial({ color: 0x040410 });
+  const glow = () => new THREE.MeshBasicMaterial({ color: col });
+  const armor= () => new THREE.MeshBasicMaterial({ color: 0x080820 });
+
+  function part(w, h, d, mat, x = 0, y = 0, z = 0) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); group.add(m);
   }
+
+  // Wide armored body
+  part(0.95, 0.18, 2.0,  dark(), 0, 0.18, 0);
+  part(0.75, 0.22, 1.55, dark(), 0, 0.4,  0);
+  // Side armor plates
+  part(0.1,  0.42, 1.6, armor(), -0.52, 0.22, 0);
+  part(0.1,  0.42, 1.6, armor(),  0.52, 0.22, 0);
+  // Cockpit block
+  part(0.5,  0.18, 0.55, dark(), 0, 0.6, -0.15);
+
+  // Glow lines — thick and bold
+  part(0.97, 0.03, 2.02, glow(),  0,     0.03,   0);    // bottom edge
+  part(0.03, 0.44, 2.02, glow(), -0.48,  0.22,   0);    // left edge
+  part(0.03, 0.44, 2.02, glow(),  0.48,  0.22,   0);    // right edge
+  part(0.97, 0.03, 0.03, glow(),  0,     0.44,  -1.0);  // front top
+  part(0.97, 0.03, 0.03, glow(),  0,     0.44,   1.0);  // back top
+
+  // Two wheels (front and back)
+  for (const wz of [-0.55, 0.65]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.09, 24), dark());
+    w.rotation.z = Math.PI / 2; w.position.set(0, 0.26, wz); group.add(w);
+    const r = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.022, 8, 24), glow());
+    r.rotation.y = Math.PI / 2; r.position.set(0, 0.26, wz); group.add(r);
+  }
+
+  return group;
+}
+
+function createSpeederBike(hexColor) {
+  const group = new THREE.Group();
+  const col  = new THREE.Color(hexColor);
+  const dark = () => new THREE.MeshBasicMaterial({ color: 0x060614 });
+  const glow = () => new THREE.MeshBasicMaterial({ color: col });
+
+  function part(w, h, d, mat, x = 0, y = 0, z = 0, rx = 0) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z); m.rotation.x = rx; group.add(m);
+  }
+
+  // Ultra-slim fuselage, lifted
+  part(0.22, 0.09, 2.1, dark(), 0, 0.35, 0);
+  part(0.14, 0.07, 1.6, dark(), 0, 0.44, 0);
+
+  // Glow trim
+  part(0.24, 0.015, 2.12, glow(),  0,     0.31, 0);    // belly glow
+  part(0.015, 0.1, 2.12, glow(), -0.12,  0.38, 0);    // left side
+  part(0.015, 0.1, 2.12, glow(),  0.12,  0.38, 0);    // right side
+  part(0.24, 0.015, 0.015, glow(), 0,     0.44,-1.05); // nose glow
+
+  // Rear wing (horizontal spoiler)
+  part(0.9, 0.025, 0.28, dark(), 0, 0.52, 0.85);
+  part(0.9, 0.015, 0.28, glow(), 0, 0.54, 0.85);
+
+  // Single wheel (front)
+  const w = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.055, 24), dark());
+  w.rotation.z = Math.PI / 2; w.position.set(0, 0.19, -0.75); group.add(w);
+  const r = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.014, 8, 24), glow());
+  r.rotation.y = Math.PI / 2; r.position.set(0, 0.19, -0.75); group.add(r);
+
+  // Rear engine nozzle glow
+  part(0.18, 0.06, 0.08, glow(), 0, 0.36, 1.1);
 
   return group;
 }
@@ -113,49 +179,146 @@ function buildArena(g) {
   GRID = g;
   const cx = g / 2, cz = g / 2;
 
-  // Floor — plain Three.js API, no Object.assign shortcuts that break Euler
+  scene.fog = new THREE.Fog(0x010108, 20, 110);
+
+  // ── Main floor
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(g + 2, g + 2),
+    new THREE.PlaneGeometry(g + 36, g + 36),
     new THREE.MeshBasicMaterial({ color: 0x010108 })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(cx, 0, cz);
   scene.add(floor);
 
-  // TRON Legacy grid lines (primary + fine sub-grid)
+  // ── Grid lines (main arena)
   function addGrid(step, color) {
     const pts = [];
-    const n   = Math.round(g / step);
+    const n = Math.round(g / step);
     for (let i = 0; i <= n; i++) {
       const v = i * step;
-      pts.push(v, 0.003, 0,  v, 0.003, g);
-      pts.push(0, 0.003, v,  g, 0.003, v);
+      pts.push(v, 0.003, 0, v, 0.003, g);
+      pts.push(0, 0.003, v, g, 0.003, v);
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
     scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color })));
   }
-  addGrid(1,   0x0033bb); // primary
-  addGrid(0.5, 0x001155); // sub-grid
+  addGrid(1,   0x0033bb);
+  addGrid(0.5, 0x001155);
 
-  // Border walls
-  const wallMat = new THREE.MeshBasicMaterial({ color: 0x0055ff });
-  const wh = 3.2;
-  [
-    [g + 1, wh, 0.1,   cx,       wh / 2, -0.05],
-    [g + 1, wh, 0.1,   cx,       wh / 2,  g + 0.05],
-    [0.1,   wh, g + 1, -0.05,    wh / 2,  cz],
-    [0.1,   wh, g + 1,  g + 0.05, wh / 2, cz],
-  ].forEach(([w, h, d, x, y, z]) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+  // ── Tall arena border walls
+  const wallMat = new THREE.MeshBasicMaterial({ color: 0x010115 });
+  const wh = 14;
+  function addWall(w, h, d, x, y, z) {
+    scene.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat), { position: new THREE.Vector3(x, y, z) }));
+  }
+  addWall(g + 1, wh, 0.12,   cx,        wh/2, -0.06);
+  addWall(g + 1, wh, 0.12,   cx,        wh/2,  g + 0.06);
+  addWall(0.12,  wh, g + 1,  -0.06,     wh/2,  cz);
+  addWall(0.12,  wh, g + 1,   g + 0.06, wh/2,  cz);
+
+  // Wall glow lines (top + base)
+  function seg(pts, col) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: col })));
+  }
+  seg([0,wh,0, g,wh,0], 0x0055ff); seg([0,wh,g, g,wh,g], 0x0055ff);
+  seg([0,wh,0, 0,wh,g], 0x0055ff); seg([g,wh,0, g,wh,g], 0x0055ff);
+  seg([0,0.01,0, g,0.01,0], 0x0033aa); seg([0,0.01,g, g,0.01,g], 0x0033aa);
+  seg([0,0.01,0, 0,0.01,g], 0x0033aa); seg([g,0.01,0, g,0.01,g], 0x0033aa);
+
+  // ── Elevated side platforms (TRON Legacy upper tier)
+  const platH   = 6;
+  const platW   = 11;
+  const platCxL = -(platW / 2 + 2);    // left platform center X
+  const platCxR =  g + platW / 2 + 2;  // right platform center X
+  const platMat = new THREE.MeshBasicMaterial({ color: 0x010110 });
+
+  function addBox(w, h, d, x, y, z, mat) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, y, z);
     scene.add(m);
-  });
+    return m;
+  }
+
+  addBox(platW, 0.3, g + 2, platCxL, platH, cz, platMat);
+  addBox(platW, 0.3, g + 2, platCxR, platH, cz, platMat);
+
+  // Platform grid lines
+  function addPlatGrid(cxPlat, col) {
+    const pts = [];
+    const nSteps = Math.round((g + 2) / 4);
+    for (let i = 0; i <= nSteps; i++) {
+      const v = -1 + i * 4;
+      pts.push(cxPlat - platW/2, platH+0.16, v, cxPlat + platW/2, platH+0.16, v);
+    }
+    seg(pts, col);
+  }
+  addPlatGrid(platCxL, 0x002288);
+  addPlatGrid(platCxR, 0x002288);
+
+  // Platform inner edge glow
+  seg([platCxL+platW/2, platH+0.16, 0, platCxL+platW/2, platH+0.16, g], 0x0044cc);
+  seg([platCxR-platW/2, platH+0.16, 0, platCxR-platW/2, platH+0.16, g], 0x0044cc);
+  seg([platCxL-platW/2, platH+0.16, 0, platCxL-platW/2, platH+0.16, g], 0x002299);
+  seg([platCxR+platW/2, platH+0.16, 0, platCxR+platW/2, platH+0.16, g], 0x002299);
+
+  // ── Ramps from ground (y=0) to platforms (y=platH)
+  const rampRun = 9;
+  const rampLen = Math.sqrt(rampRun * rampRun + platH * platH);
+  const rampAng = Math.atan2(platH, rampRun);
+
+  function addRamp(px, frontOfArena) {
+    const ramp = new THREE.Mesh(new THREE.BoxGeometry(platW, 0.28, rampLen), platMat);
+    ramp.rotation.x = frontOfArena ? -rampAng : rampAng;
+    // Center of ramp sits midway between y=0 and y=platH
+    ramp.position.set(px, platH / 2, frontOfArena ? -rampRun / 2 : g + rampRun / 2);
+    scene.add(ramp);
+  }
+  addRamp(platCxL, true);  addRamp(platCxL, false);
+  addRamp(platCxR, true);  addRamp(platCxR, false);
+
+  // ── Support columns under platforms
+  const nCols = Math.max(3, Math.round(g / 18));
+  const colMat = new THREE.MeshBasicMaterial({ color: 0x020218 });
+  for (let i = 0; i < nCols; i++) {
+    const colZ = 2 + (i / (nCols - 1)) * (g - 4);
+    for (const colX of [platCxL, platCxR]) {
+      const col = addBox(0.5, platH, 0.5, colX, platH / 2, colZ, colMat);
+      const lineGeo = new THREE.EdgesGeometry(col.geometry);
+      const line = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ color: 0x002299 }));
+      line.position.copy(col.position);
+      scene.add(line);
+    }
+  }
+
+  // ── Corner towers
+  const tH = 22;
+  const towerMat = new THREE.MeshBasicMaterial({ color: 0x010108 });
+  for (const [tx, tz] of [[-1.5,-1.5],[g+1.5,-1.5],[-1.5,g+1.5],[g+1.5,g+1.5]]) {
+    const tw = addBox(1.6, tH, 1.6, tx, tH / 2, tz, towerMat);
+    const te = new THREE.LineSegments(
+      new THREE.EdgesGeometry(tw.geometry),
+      new THREE.LineBasicMaterial({ color: 0x0055ff })
+    );
+    te.position.copy(tw.position);
+    scene.add(te);
+  }
+
+  // ── Overhead light bridges across the arena at wall height
+  const nBridges = Math.max(3, Math.round(g / 20));
+  const bridgeMat = new THREE.MeshBasicMaterial({ color: 0x0033aa });
+  for (let i = 1; i < nBridges; i++) {
+    const bz = (i / nBridges) * g;
+    addBox(g + 30, 0.1, 0.09, cx, wh, bz, bridgeMat);
+  }
 }
 
 // ── Game state ─────────────────────────────────────────────────────────────
-let myId      = null;
-let isHost    = false;
+let myId        = null;
+let myBikeStyle = 'blade';
+let isHost      = false;
 let players   = {};
 let lastTick  = 0;
 let tickMs    = 80;
@@ -213,6 +376,8 @@ socket.on('room-error',    msg => { document.getElementById('lobby-error').textC
 socket.on('lobby-update',  d   => {
   refreshPlayerList(d.players);
   updateGridSizeUI(d.gridSize || 64, isHost);
+  const me = d.players.find(p => p.id === socket.id);
+  if (me) { myBikeStyle = me.bikeStyle || 'blade'; updateBikeStyleUI(myBikeStyle); }
   // When host restarts, bring everyone back to the waiting room
   if (d.state === 'lobby' && !gameActive &&
       document.getElementById('game-container').style.display !== 'none') {
@@ -288,9 +453,21 @@ socket.on('game-paused', () => {
   document.getElementById('mb-pause').textContent  = '▶';
 });
 
+socket.on('countdown', ({ count }) => {
+  const overlay = document.getElementById('countdown-overlay');
+  const num     = document.getElementById('countdown-num');
+  overlay.style.display = 'flex';
+  num.textContent = count;
+  // Re-trigger animation
+  num.style.animation = 'none';
+  num.offsetHeight; // reflow
+  num.style.animation = '';
+});
+
 socket.on('game-resumed', () => {
   isPaused = false;
-  document.getElementById('pause-screen').style.display = 'none';
+  document.getElementById('pause-screen').style.display   = 'none';
+  document.getElementById('countdown-overlay').style.display = 'none';
   document.getElementById('pause-btn').textContent = '⏸';
   document.getElementById('mb-pause').textContent  = '⏸';
 });
@@ -334,7 +511,7 @@ function startGame(data) {
   document.getElementById('spectate-hud').style.display = 'none';
 
   for (const pd of data.players) {
-    const mesh = createBike(pd.color);
+    const mesh = createBike(pd.color, pd.bikeStyle || 'blade');
     mesh.position.set(pd.x, 0, pd.y);
     mesh.rotation.y = BIKE_ROT[pd.dir];
     mesh.visible = pd.id !== myId; // always hide own bike in first-person at start
@@ -443,7 +620,17 @@ function showWaiting(data, host) {
   document.getElementById('grid-size-picker').style.display = host ? 'block' : 'none';
   document.getElementById('grid-size-display').style.display = host ? 'none' : 'block';
   updateGridSizeUI(data.gridSize || 64, host);
+  // Find my bike style from player list
+  const me = data.players.find(p => p.id === socket.id);
+  if (me) { myBikeStyle = me.bikeStyle || 'blade'; }
+  updateBikeStyleUI(myBikeStyle);
   refreshPlayerList(data.players);
+}
+
+function updateBikeStyleUI(style) {
+  document.querySelectorAll('.bike-style-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.style === style);
+  });
 }
 
 function updateGridSizeUI(size, host) {
@@ -514,6 +701,11 @@ document.getElementById('start-btn').addEventListener('click',       () => socke
 document.querySelectorAll('.grid-size-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     socket.emit('set-grid-size', { size: Number(btn.dataset.size) });
+  });
+});
+document.querySelectorAll('.bike-style-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    socket.emit('set-bike-style', { style: btn.dataset.style });
   });
 });
 document.getElementById('add-bot-btn').addEventListener('click',     () => socket.emit('add-bot'));
